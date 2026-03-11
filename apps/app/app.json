@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Drops Driver",
+    "slug": "drops-driver",
+    "scheme": "drops-driver",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": ["expo-router", "expo-location", "expo-notifications"],
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

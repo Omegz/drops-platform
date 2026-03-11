@@ -1,0 +1,25 @@
+{
+  "name": "@drops/maps",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.tsx",
+  "types": "src/index.tsx",
+  "exports": {
+    ".": {
+      "types": "./src/index.tsx",
+      "default": "./src/index.tsx"
+    }
+  },
+  "dependencies": {
+    "@drops/contracts": "workspace:*",
+    "@drops/ui": "workspace:*",
+    "react": "19.2.0",
+    "react-native": "0.83.2",
+    "react-native-svg": "^15.15.3"
+  },
+  "scripts": {
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

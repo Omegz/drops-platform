@@ -1,0 +1,16 @@
+{
+  "short_name": "Drops Driver",
+  "name": "Drops Driver Dispatch App",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#101312",
+  "theme_color": "#B8FF65",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

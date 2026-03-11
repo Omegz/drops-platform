@@ -1,0 +1,19 @@
+{
+  "name": "drops-platform",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "pnpm --filter @drops/api db:migrate",
+    "deploy:api": "pnpm --filter @drops/api deploy",
+    "deploy:driver-app": "pnpm --filter @drops/driver-app deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
+  }
+}

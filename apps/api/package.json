@@ -1,0 +1,27 @@
+{
+  "name": "@drops/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "deploy": "vercel deploy --prod",
+    "dev": "tsx watch src/server.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@drops/contracts": "workspace:*",
+    "@hono/node-server": "^1.19.4",
+    "hono": "^4.9.8",
+    "saasignal": "^0.9.19",
+    "web-push": "^3.6.7",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/web-push": "^3.6.4",
+    "tsx": "^4.20.5",
+    "vercel": "^48.4.1"
+  }
+}

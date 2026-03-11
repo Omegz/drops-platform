@@ -31,6 +31,7 @@ const webhookService = new CustomerWebhookService();
 const saasignalService = SaaSignalDispatchService.fromEnv();
 const logisticsService = new SaaSignalLogisticsService(
   saasignalService ? "saasignal-logistics" : "local-fallback",
+  saasignalService,
 );
 
 export const roleService = new RoleService(authRepository);

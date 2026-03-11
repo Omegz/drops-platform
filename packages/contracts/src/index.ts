@@ -147,6 +147,13 @@ export const CreateOrderSchema = z.object({
   customerWebhookUrl: z.string().url().optional(),
 });
 
+export const CreatePublicOrderSchema = z.object({
+  pickup: AddressPointSchema,
+  dropoff: AddressPointSchema,
+  notes: z.string().max(500).optional(),
+  priority: z.enum(["normal", "priority"]).default("normal"),
+});
+
 export const DispatchCandidateSchema = z.object({
   driverId: z.string(),
   distanceKm: z.number().min(0),
@@ -272,6 +279,12 @@ export const CustomerOrderViewSchema = z.object({
   shareUrl: z.string().url(),
 });
 
+export const DemoDispatchBoardSchema = z.object({
+  generatedAt: z.string().datetime(),
+  primaryDriverId: z.string().nullable(),
+  drivers: z.array(DriverDashboardSchema),
+});
+
 export const ApiErrorSchema = z.object({
   code: z.string(),
   message: z.string(),
@@ -301,6 +314,7 @@ export type DriverAvailability = z.infer<typeof DriverAvailabilitySchema>;
 export type DriverLocationUpdate = z.infer<typeof DriverLocationUpdateSchema>;
 export type DriverDeviceRegistration = z.infer<typeof DriverDeviceRegistrationSchema>;
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
+export type CreatePublicOrderInput = z.infer<typeof CreatePublicOrderSchema>;
 export type DispatchCandidate = z.infer<typeof DispatchCandidateSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type DispatchDecision = z.infer<typeof DispatchDecisionSchema>;
@@ -320,3 +334,4 @@ export type NavigationLinks = z.infer<typeof NavigationLinksSchema>;
 export type ActiveDriverAssignment = z.infer<typeof ActiveDriverAssignmentSchema>;
 export type DriverDashboard = z.infer<typeof DriverDashboardSchema>;
 export type CustomerOrderView = z.infer<typeof CustomerOrderViewSchema>;
+export type DemoDispatchBoard = z.infer<typeof DemoDispatchBoardSchema>;

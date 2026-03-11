@@ -1,7 +1,5 @@
 import { Hono } from "hono";
-import {
-  MagicLinkRequestSchema,
-} from "@drops/contracts";
+import { MagicLinkRequestSchema } from "@drops/contracts";
 import type { AppEnv } from "../lib/request-context.js";
 import { respond } from "../lib/response.js";
 import { parseJson } from "../lib/validation.js";
@@ -17,6 +15,21 @@ export const authRoutes = new Hono<AppEnv>()
   .post("/auth/magic-links/request", async (c) =>
     respond(c, await authService.requestMagicLink(await parseJson(c, MagicLinkRequestSchema)), 201),
   )
+  .get("/auth/google/start", async (c) =>
+    c.redirect(
+      await authService.beginGoogleSignIn(
+        c.req.query("next") ?? c.req.query("redirectPath"),
+      ),
+      302,
+    ),
+  )
+  .get("/auth/google/callback", async (c) => {
+    const payload = await authService.verifyGoogleCallback(
+      c.req.query("code") ?? "",
+      c.req.query("state"),
+    );
+    return c.redirect(payload.redirectUrl, 302);
+  })
   .get("/auth/magic-links/verify", async (c) => {
     const token = c.req.query("token");
     const payload = await authService.verifyMagicLink(token ?? "");

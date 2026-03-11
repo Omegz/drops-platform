@@ -77,7 +77,13 @@ export default function SettingsScreen() {
                     {session.activeRole === role ? (
                       <StatusPill label="Active" tone="pickup" />
                     ) : (
-                      <GlowButton onPress={() => void switchRole(role)}>
+                      <GlowButton
+                        onPress={() =>
+                          void switchRole(role).then(() => {
+                            router.replace(role === "driver" ? "/driver" : "/customer");
+                          })
+                        }
+                      >
                         Switch
                       </GlowButton>
                     )}

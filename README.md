@@ -3,7 +3,7 @@
 Unified dispatch monorepo for an Uber-like delivery product with:
 
 - `apps/api`: Hono API on Vercel for auth, customer orders, driver operations, tracking, realtime credentials, webhooks, and dispatch orchestration
-- `apps/app`: one Expo Router web/PWA app on Vercel that contains customer, driver, settings, and public tracking routes
+- `apps/app`: one Expo Router web/PWA app on Vercel that contains public landing, sign-in, customer, driver, settings, and public tracking routes
 - `packages/contracts`: shared Zod contracts for API and app
 - `packages/ui`: gluestack-based shared design primitives
 - `packages/maps`: shared night-map rendering primitives used by customer and driver flows
@@ -28,16 +28,16 @@ The API follows a thin-route + service-layer pattern and now exposes:
 - `/api/v1/admin/driver-invitations*` for invite-and-approve driver enablement
 - `/api/v1/tracking/:trackingToken` and `/api/v1/realtime/*` for public/live tracking
 
-Cloudflare D1 remains the canonical store. SaaSignal is used for channels, background jobs, and the current logistics abstraction layer that feeds route/ETA payloads to the frontend.
+Cloudflare D1 remains the canonical store. SaaSignal is used for channels, delayed jobs, delivery suggestions, live tracking, and route/ETA payloads that feed the frontend.
 
 ### App
 
-The Expo app is now one unified surface, split by role:
+The Expo app is one unified surface, split by role:
 
-- `/` public landing
-- `/sign-in` magic-link sign-in
-- `/customer` customer order creation and live order state
-- `/driver` driver city map, incoming offer state, and active trip workflow
+- `/` public landing with customer-first sign-in entry
+- `/sign-in` Resend magic-link and Google OAuth sign-in
+- `/customer` authenticated customer order creation and live order state
+- `/driver` authenticated driver city map, incoming offer state, and active trip workflow
 - `/settings` role switching and session controls
 - `/track/[token]` public tracking view
 
@@ -70,9 +70,12 @@ Production-oriented variables:
 
 - `API_BASE_URL`
 - `APP_BASE_URL`
+- `AUTH_STATE_SECRET`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_D1_DATABASE_ID`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
 - `SAASIGNAL_API_KEY`
 - `SAASIGNAL_API_URL`
 - `CUSTOMER_WEBHOOK_SIGNING_SECRET`
@@ -111,6 +114,8 @@ The repo now includes app-local Vercel config in:
 - [apps/api/vercel.json](/Users/omar/workDevelopment/personalProjects/dropsAppApi/apps/api/vercel.json)
 - [apps/app/vercel.json](/Users/omar/workDevelopment/personalProjects/dropsAppApi/apps/app/vercel.json)
 
+The legacy root-level Vercel shim is no longer part of the deployment shape. Production should link only these two workspaces.
+
 Recommended production URLs:
 
 - API: `https://api.your-domain.com`
@@ -148,11 +153,9 @@ Current repo verification that passes:
 
 - `pnpm --filter @drops/api typecheck`
 - `pnpm --filter @drops/app typecheck`
-- `pnpm typecheck`
 - `pnpm build`
 
 ## Known follow-ups
 
-- Google OAuth is not wired end-to-end yet; the current working auth path is magic-link sign-in.
-- SaaSignal logistics is represented through the internal `SaaSignalLogisticsService` abstraction; direct provider-specific routing APIs are not yet integrated in this repo.
+- Better Auth is still a future integration; the current working auth layer is role-aware bearer sessions with Resend magic links and Google OAuth.
 - Native iOS/Android packaging is still future work, but the unified Expo app and shared packages are structured for that split.

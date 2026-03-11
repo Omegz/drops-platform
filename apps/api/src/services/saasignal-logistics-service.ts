@@ -7,6 +7,7 @@ import type {
   TrackingDriver,
 } from "@drops/contracts";
 import { haversineDistanceKm } from "../lib/haversine.js";
+import type { SaaSignalDispatchService } from "./saasignal-service.js";
 
 const buildRoutePoints = (start: Coordinate, end: Coordinate): Coordinate[] => {
   const midpoint = {
@@ -36,9 +37,23 @@ const hasTrackingPoint = (
 ): driver is TrackingDriver => "point" in driver;
 
 export class SaaSignalLogisticsService {
-  constructor(private readonly providerLabel = "saasignal-logistics") {}
+  constructor(
+    private readonly providerLabel = "saasignal-logistics",
+    private readonly saasignalService: SaaSignalDispatchService | null = null,
+  ) {}
 
-  rankDrivers(candidates: Driver[], order: Order): DispatchCandidate[] {
+  async rankDrivers(candidates: Driver[], order: Order): Promise<DispatchCandidate[]> {
+    if (this.saasignalService) {
+      try {
+        const ranked = await this.saasignalService.suggestDriversForOrder(order, candidates);
+        if (ranked.length) {
+          return ranked;
+        }
+      } catch {
+        // Fall back to local ranking when SaaSignal is unavailable or unseeded.
+      }
+    }
+
     return candidates
       .filter((driver) => driver.lastKnownLocation)
       .map((driver) => {
@@ -66,7 +81,7 @@ export class SaaSignalLogisticsService {
       .sort((left, right) => left.score - right.score);
   }
 
-  buildTaskMap(order: Order, driver: DriverPointCarrier | null): TaskMap {
+  async buildTaskMap(order: Order, driver: DriverPointCarrier | null): Promise<TaskMap> {
     const activeLeg =
       order.status === "accepted" || order.status === "on_the_way"
         ? "to_pickup"
@@ -128,17 +143,24 @@ export class SaaSignalLogisticsService {
         : activeLeg === "to_dropoff"
           ? order.dropoff.point
           : order.dropoff.point;
-    const distanceKm = haversineDistanceKm(routeStart, routeEnd);
-    const points = buildRoutePoints(routeStart, routeEnd);
+
+    const saasignalRoute = await this.buildSaaSignalRoute(routeStart, routeEnd);
+    const distanceKm =
+      saasignalRoute?.distanceKm ?? haversineDistanceKm(routeStart, routeEnd);
+    const points = saasignalRoute?.points.length
+      ? saasignalRoute.points
+      : buildRoutePoints(routeStart, routeEnd);
+    const etaMinutes =
+      saasignalRoute?.etaMinutes ?? (activeLeg === "completed" ? 0 : toEtaMinutes(distanceKm));
 
     return {
       activeLeg,
-      etaMinutes: activeLeg === "completed" ? 0 : toEtaMinutes(distanceKm),
+      etaMinutes,
       primaryStop,
       secondaryStop,
       route: {
-        provider: this.providerLabel,
-        etaMinutes: activeLeg === "completed" ? 0 : toEtaMinutes(distanceKm),
+        provider: saasignalRoute?.provider ?? this.providerLabel,
+        etaMinutes,
         distanceKm: Number(distanceKm.toFixed(2)),
         points,
       },
@@ -153,6 +175,18 @@ export class SaaSignalLogisticsService {
         },
       },
     };
+  }
+
+  private async buildSaaSignalRoute(origin: Coordinate, destination: Coordinate) {
+    if (!this.saasignalService) {
+      return null;
+    }
+
+    try {
+      return await this.saasignalService.buildRoute(origin, destination);
+    } catch {
+      return null;
+    }
   }
 }
 type DriverPointCarrier =

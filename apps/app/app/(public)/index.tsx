@@ -1,6 +1,6 @@
 import { Redirect, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Box, Divider, HStack, ScrollView, Text, VStack } from "@gluestack-ui/themed";
+import { Box, HStack, ScrollView, Text, VStack } from "@gluestack-ui/themed";
 import { NightCityMap } from "@drops/maps";
 import {
   DispatchScreen,
@@ -10,17 +10,15 @@ import {
   HeroTitle,
   MetricRow,
   SectionHeader,
-  StatusPill,
   SupportingText,
   palette,
 } from "@drops/ui";
+import { buildTrackingMarkers, previewMap } from "@/lib/dispatch-data";
 import { useSession } from "@/lib/session";
-import { previewMap } from "@/lib/dispatch-data";
-import { buildTrackingMarkers } from "@/lib/dispatch-data";
 
 const previewTrackingMarkers = buildTrackingMarkers({
   orderId: "preview",
-  status: "on_the_way",
+  status: "offer_sent",
   trackingUrl: "https://drops.example/track/demo",
   pickup: {
     addressLine: "Nyhavn 1, Copenhagen",
@@ -32,9 +30,9 @@ const previewTrackingMarkers = buildTrackingMarkers({
   },
   driver: {
     id: "drv_preview",
-    name: "Mikael",
-    vehicleLabel: "City EV",
-    point: { latitude: 55.6814, longitude: 12.5951 },
+    name: "Sara Nielsen",
+    vehicleLabel: "Bike 4",
+    point: { latitude: 55.6841, longitude: 12.5814 },
     updatedAt: new Date().toISOString(),
   },
   timeline: [],
@@ -52,86 +50,85 @@ export default function LandingScreen() {
     <DispatchScreen padded={false}>
       <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
         <LinearGradient
-          colors={["#0A0F20", "#07111A", "#040711"]}
+          colors={["#06101B", "#040711", "#130C1C"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ paddingHorizontal: 22, paddingTop: 28, paddingBottom: 22 }}
+          style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 26 }}
         >
           <VStack gap="$5">
             <VStack gap="$3">
-              <Eyebrow>Unified Dispatch App</Eyebrow>
-              <HeroTitle>One map-led product for customers now, split-ready for drivers later.</HeroTitle>
+              <Eyebrow>Unified Dispatch</Eyebrow>
+              <HeroTitle>Night-shift dispatch for customers, drivers, and public tracking in one shared Expo app.</HeroTitle>
               <SupportingText>
-                The customer creates a pickup and dropoff request. The closest viable driver gets an offer, accepts or rejects it, then moves through pickup and delivery with live tracking.
+                Customers create and watch a live run on the same map. Drivers stay on a city watch surface with offers, task progression, and external navigation handoff.
               </SupportingText>
             </VStack>
 
             <NightCityMap
               map={previewMap}
-              title="Night dispatch board"
-              subtitle="Pickup and dropoff stay bright while the live driver position feeds the customer tracker."
+              title="Control room preview"
+              subtitle="Pickup, dropoff, and driver movement stay bright on one shared dispatch canvas."
               markers={previewTrackingMarkers}
               height={430}
             />
 
             <HStack gap="$3" flexWrap="wrap">
-              <GlowButton onPress={() => router.push("/sign-in?next=/customer")}>
-                Enter customer flow
+              <GlowButton
+                onPress={() =>
+                  router.push({
+                    pathname: "/sign-in",
+                    params: { next: "/customer" },
+                  })
+                }
+              >
+                Sign in to order
               </GlowButton>
               <GlowButton
                 tone="secondary"
                 variant="outline"
-                onPress={() => router.push("/sign-in?next=/driver")}
+                onPress={() =>
+                  router.push({
+                    pathname: "/sign-in",
+                    params: { next: "/driver" },
+                  })
+                }
               >
-                Enter driver console
+                Driver sign-in
               </GlowButton>
+            </HStack>
+
+            <HStack gap="$5" flexWrap="wrap">
+              <MetricRow label="Surface" value="One Expo app" />
+              <MetricRow label="Realtime" value="SaaSignal channels" />
+              <MetricRow label="Routing" value="SaaSignal logistics" />
             </HStack>
           </VStack>
         </LinearGradient>
 
         <VStack gap="$4" style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+          <GlowPanel tone="pickup">
+            <SectionHeader
+              title="Customer-first entry"
+              detail="Signed-out users start here. Once signed in, customer mode stays focused on request creation and live order state."
+            />
+            <Text style={{ color: palette.textMuted, fontSize: 16, lineHeight: 24, marginTop: 16 }}>
+              The customer path does not split into a second frontend anymore. Order creation, waiting state, and shared tracking all live behind the same shell.
+            </Text>
+          </GlowPanel>
+
           <GlowPanel tone="driver">
             <SectionHeader
-              title="What feels different"
-              detail="This is a control-room product, not a dashboard stack."
-              right={<StatusPill label="PWA live" tone="pickup" />}
+              title="Driver operations"
+              detail="Approved driver accounts switch roles inside the app and land on a map-first operational surface."
             />
-            <HStack gap="$5" flexWrap="wrap" style={{ marginTop: 20 }}>
-              <MetricRow label="Realtime" value="Driver + tracker streams" />
-              <MetricRow label="Allocation" value="Distance + load aware" />
-              <MetricRow label="Flow" value="Request -> offer -> ride" />
-            </HStack>
+            <Text style={{ color: palette.textMuted, fontSize: 16, lineHeight: 24, marginTop: 16 }}>
+              Incoming offers surface on the live city map, task state moves with swipe controls, and Google Maps is only the external navigation launcher.
+            </Text>
           </GlowPanel>
-
-          <GlowPanel>
-            <VStack gap="$4">
-              <SectionHeader
-                title="Customer side"
-                detail="Map-first order creation, waiting state, and public live tracking."
-              />
-              <Text style={{ color: palette.textMuted, fontSize: 16, lineHeight: 24 }}>
-                Customers choose pickup and dropoff on the city map, submit once, and stay on the same surface until the driver completes the run.
-              </Text>
-            </VStack>
-          </GlowPanel>
-
-          <GlowPanel tone="dropoff">
-            <VStack gap="$4">
-              <SectionHeader
-                title="Driver side"
-                detail="Idle city map, incoming offer toast, and swipe-based progression."
-              />
-              <Text style={{ color: palette.textMuted, fontSize: 16, lineHeight: 24 }}>
-                Drivers can go online, inspect the order context directly on the map, launch navigation to the active stop, and close the run with a deliberate swipe.
-              </Text>
-            </VStack>
-          </GlowPanel>
-
-          <Divider style={{ backgroundColor: palette.border }} />
 
           <Box style={{ paddingBottom: 24 }}>
             <Text style={{ color: palette.textMuted, fontSize: 14 }}>
-              Invite-only driver mode can be attached to the same account later from settings.
+              Public tracking stays directly visitable at `/track/[token]`, without requiring login.
             </Text>
           </Box>
         </VStack>

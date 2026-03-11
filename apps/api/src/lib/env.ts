@@ -29,6 +29,10 @@ export const env = {
   apiBaseUrl: process.env.API_BASE_URL ?? inferredBaseUrl ?? "http://localhost:3000",
   appBaseUrl: process.env.APP_BASE_URL ?? inferredBaseUrl ?? "http://localhost:8081",
   adminEmails: process.env.ADMIN_EMAILS ?? "",
+  authStateSecret:
+    process.env.AUTH_STATE_SECRET ??
+    process.env.INTERNAL_JOB_SECRET ??
+    "local-dev-job-secret",
   customerWebhookSigningSecret: process.env.CUSTOMER_WEBHOOK_SIGNING_SECRET ?? "",
   cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
   cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,

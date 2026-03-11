@@ -415,7 +415,7 @@ export class DispatchService {
           }
         : null,
       timeline: await this.repository.listOrderEvents(order.id),
-      map: this.logisticsService.buildTaskMap(order, driver),
+      map: await this.logisticsService.buildTaskMap(order, driver),
     };
   }
 

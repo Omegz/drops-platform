@@ -2,6 +2,7 @@ import type {
   AppRole,
   CreateOrderInput,
   CustomerOrderView,
+  Driver,
   DriverAvailability,
   DriverDashboard,
   DriverDeviceRegistration,
@@ -34,6 +35,8 @@ const inferApiBaseUrl = () => {
 };
 
 export const API_BASE_URL = inferApiBaseUrl();
+export const buildGoogleSignInUrl = (next = "/customer") =>
+  `${API_BASE_URL}/api/auth/google/start?next=${encodeURIComponent(next)}`;
 
 type ApiEnvelope<T> = {
   data: T;
@@ -129,7 +132,7 @@ export const api = {
     availability: DriverAvailability,
     sessionToken?: string | null,
   ) =>
-    apiFetch(
+    apiFetch<Driver>(
       "/api/v1/driver/status",
       {
         method: "POST",
@@ -141,7 +144,7 @@ export const api = {
     location: DriverLocationUpdate,
     sessionToken?: string | null,
   ) =>
-    apiFetch(
+    apiFetch<Driver>(
       "/api/v1/driver/location",
       {
         method: "POST",
@@ -153,7 +156,7 @@ export const api = {
     registration: DriverDeviceRegistration,
     sessionToken?: string | null,
   ) =>
-    apiFetch(
+    apiFetch<{ ok: true }>(
       "/api/v1/driver/devices",
       {
         method: "POST",
@@ -179,7 +182,7 @@ export const api = {
     status: "accepted" | "on_the_way" | "picked_up" | "dropped_off" | "cancelled",
     sessionToken?: string | null,
   ) =>
-    apiFetch(
+    apiFetch<DriverDashboard["activeAssignment"]>(
       `/api/v1/driver/orders/${orderId}/status`,
       {
         method: "POST",

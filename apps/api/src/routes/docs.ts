@@ -5,13 +5,25 @@ import type { AppEnv } from "../lib/request-context.js";
 export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
   respond(c, {
     product: "Drops unified dispatch platform",
-    version: "0.2.0",
+    version: "0.3.0",
     surfaces: [
+      {
+        operationId: "getAuthProviders",
+        method: "GET",
+        path: "/api/auth/providers",
+        summary: "Read which auth providers are active for the shared customer and driver app.",
+      },
       {
         operationId: "requestMagicLink",
         method: "POST",
         path: "/api/auth/magic-links/request",
         summary: "Request a sign-in magic link for the shared customer and driver app.",
+      },
+      {
+        operationId: "startGoogleAuth",
+        method: "GET",
+        path: "/api/auth/google/start",
+        summary: "Start the Google OAuth flow and return to the shared app with a bearer session.",
       },
       {
         operationId: "getSession",
@@ -44,6 +56,12 @@ export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
         summary: "Get the current active customer order and live tracking state.",
       },
       {
+        operationId: "getCustomerOrder",
+        method: "GET",
+        path: "/api/v1/customer/orders/:orderId",
+        summary: "Get a specific authenticated customer order and its tracking payload.",
+      },
+      {
         operationId: "getDriverDashboard",
         method: "GET",
         path: "/api/v1/driver/dashboard",
@@ -66,6 +84,12 @@ export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
         method: "POST",
         path: "/api/v1/driver/orders/:orderId/status",
         summary: "Advance an accepted order through the pickup and dropoff flow.",
+      },
+      {
+        operationId: "getDriverRealtimeCredentials",
+        method: "GET",
+        path: "/api/v1/realtime/driver/subscribe",
+        summary: "Mint browser-safe realtime credentials for the driver-specific dispatch stream.",
       },
       {
         operationId: "createDriverInvitation",
@@ -95,8 +119,11 @@ export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
     providers: {
       database: "Cloudflare D1",
       compute: ["Vercel", "SaaSignal channels", "SaaSignal jobs"],
-      auth: ["magic link", "google-ready"],
-      logistics: ["SaaSignal Logistics", "Google Maps handoff"],
+      auth: ["Resend magic links", "Google OAuth", "role-aware bearer sessions"],
+      logistics: [
+        "SaaSignal SDK for routing, delivery dispatch, and live tracking",
+        "Google Maps handoff for driver navigation only",
+      ],
     },
   }),
 );

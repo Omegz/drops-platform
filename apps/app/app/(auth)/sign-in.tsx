@@ -16,7 +16,7 @@ import {
   TapCard,
   palette,
 } from "@drops/ui";
-import { api } from "@/lib/api";
+import { api, buildGoogleSignInUrl } from "@/lib/api";
 import { previewMap } from "@/lib/dispatch-data";
 import { useSession } from "@/lib/session";
 
@@ -58,7 +58,7 @@ export default function SignInScreen() {
           <NightCityMap
             map={previewMap}
             title="Secure sign-in"
-            subtitle="Magic links return you to the correct customer or driver route after verification."
+            subtitle="Resend magic links and Google OAuth both return into the same customer or driver route."
             height={340}
           />
 
@@ -67,14 +67,14 @@ export default function SignInScreen() {
               <Eyebrow>Magic link access</Eyebrow>
               <HeroTitle>Enter one identity, then switch roles when your account allows it.</HeroTitle>
               <SupportingText>
-                Customer access is default. Driver access unlocks once the account is linked to an approved driver profile.
+                New accounts start as customers. Driver mode appears only after the email is linked to an approved driver record.
               </SupportingText>
             </VStack>
 
             <GlowPanel tone="driver">
               <SectionHeader
                 title="Account details"
-                detail="Use any email for customer mode. Use a seeded driver email to demo driver mode."
+                detail="Use any email for customer mode. Approved driver emails can return straight into the driver map."
                 right={<StatusPill label={targetPath === "/driver" ? "Driver return" : "Customer return"} tone="driver" />}
               />
 
@@ -103,9 +103,21 @@ export default function SignInScreen() {
 
               <Box style={{ marginTop: 20 }}>
                 <GlowButton onPress={() => requestMutation.mutate()} isLoading={requestMutation.isPending}>
-                  Send secure link
+                  Send magic link
                 </GlowButton>
               </Box>
+
+              {providers.googleEnabled ? (
+                <Box style={{ marginTop: 12 }}>
+                  <GlowButton
+                    tone="secondary"
+                    variant="outline"
+                    onPress={() => void Linking.openURL(buildGoogleSignInUrl(targetPath))}
+                  >
+                    Continue with Google
+                  </GlowButton>
+                </Box>
+              ) : null}
 
               {previewUrl ? (
                 <VStack gap="$3" style={{ marginTop: 16 }}>
@@ -124,14 +136,14 @@ export default function SignInScreen() {
 
               <Text style={{ marginTop: 16, color: palette.textMuted, fontSize: 14 }}>
                 Magic links: {providers.magicLinkEnabled ? "enabled" : "disabled"}.
-                {" "}Google provider wiring is environment-dependent.
+                {" "}Google OAuth: {providers.googleEnabled ? "enabled" : "disabled"}.
               </Text>
             </GlowPanel>
 
             <GlowPanel>
               <SectionHeader
-                title="Driver demo identities"
-                detail="These accounts are pre-linked to seeded driver records."
+                title="Approved driver identities"
+                detail="These seeded accounts behave like already-approved invitation recipients."
               />
               <VStack gap="$3" style={{ marginTop: 16 }}>
                 {driverDemoEmails.map((driverEmail) => (

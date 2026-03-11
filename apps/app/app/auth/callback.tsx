@@ -16,7 +16,7 @@ export default function AuthCallbackScreen() {
     }
 
     setSessionToken(params.sessionToken);
-    router.replace(typeof params.next === "string" && params.next ? params.next : "/customer");
+    router.replace(typeof params.next === "string" && params.next ? params.next : "/");
   }, [params.next, params.sessionToken, router, setSessionToken]);
 
   return (

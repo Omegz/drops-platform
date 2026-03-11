@@ -3,6 +3,7 @@ import type {
   AddressPoint,
   Coordinate,
   CreateOrderInput,
+  CreatePublicOrderInput,
   Offer,
   OrderStatus,
   TaskMap,
@@ -140,6 +141,23 @@ export const buildComposerOrderInput = ({
   priority,
   pickup: toAddressPoint(pickup),
   dropoff: toAddressPoint(dropoff),
+});
+
+export const buildPublicComposerOrderInput = ({
+  pickup,
+  dropoff,
+  notes,
+  priority,
+}: {
+  pickup: LocationPreset;
+  dropoff: LocationPreset;
+  notes?: string;
+  priority: CreatePublicOrderInput["priority"];
+}): CreatePublicOrderInput => ({
+  pickup: toAddressPoint(pickup),
+  dropoff: toAddressPoint(dropoff),
+  notes: notes?.trim() || undefined,
+  priority,
 });
 
 const buildBounds = (points: Coordinate[]) => ({

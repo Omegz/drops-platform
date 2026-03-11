@@ -1,15 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Redirect, router } from "expo-router";
+import { Redirect } from "expo-router";
+import * as Linking from "expo-linking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
 import {
+  Avatar,
+  AvatarFallbackText,
   Box,
   HStack,
   Input,
   InputField,
   ScrollView,
   Text,
-  Textarea,
-  TextareaInput,
   VStack,
 } from "@gluestack-ui/themed";
 import { NightCityMap } from "@drops/maps";
@@ -18,128 +20,124 @@ import {
   Eyebrow,
   GlowButton,
   GlowPanel,
+  HeroTitle,
+  MetricRow,
   SectionHeader,
   StatusPill,
   SupportingText,
   TapCard,
   palette,
 } from "@drops/ui";
-import { TrackingScene } from "@/components/dispatch/TrackingScene";
+import { OrderTimeline } from "@/components/dispatch/OrderTimeline";
 import { api } from "@/lib/api";
+import { bindWebEventSource } from "@/lib/realtime";
+import { useSession } from "@/lib/session";
 import {
-  buildComposerOrderInput,
   buildPairMap,
+  buildTrackingMarkers,
+  buildComposerOrderInput,
   formatEta,
   locationPresets,
   orderStatusCopy,
-  previewMap,
   searchLocations,
   toAddressPoint,
 } from "@/lib/dispatch-data";
-import { bindWebEventSource } from "@/lib/realtime";
-import { useSession } from "@/lib/session";
-
-const priorityModes = [
-  {
-    value: "normal" as const,
-    label: "Normal",
-    detail: "Balanced dispatch across distance and current load.",
-  },
-  {
-    value: "priority" as const,
-    label: "Priority",
-    detail: "Bias closer drivers harder when you need a faster pickup.",
-  },
-];
 
 const LocationPicker = ({
   title,
-  value,
-  onChangeText,
-  matches,
+  query,
   selectedId,
+  onChangeQuery,
   onSelect,
 }: {
   title: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  matches: typeof locationPresets;
-  selectedId: string | null;
+  query: string;
+  selectedId: string;
+  onChangeQuery: (value: string) => void;
   onSelect: (location: (typeof locationPresets)[number]) => void;
-}) => (
-  <GlowPanel>
-    <SectionHeader title={title} detail="Search a curated city stop list for the first release." />
-    <VStack gap="$3" style={{ marginTop: 16 }}>
-      <Input style={{ backgroundColor: "transparent", borderColor: palette.border }}>
-        <InputField
-          value={value}
-          onChangeText={onChangeText}
-          placeholder="Type Nyhavn, Tivoli, Opera..."
-          color={palette.text}
-          placeholderTextColor={palette.textMuted}
-        />
-      </Input>
-      <VStack gap="$3">
-        {matches.slice(0, 4).map((location) => (
-          <TapCard key={location.id} onPress={() => onSelect(location)}>
-            <HStack justifyContent="space-between" alignItems="center" gap="$4">
-              <VStack flex={1} gap="$1">
-                <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
-                  {location.label}
-                </Text>
-                <Text style={{ color: palette.textMuted, fontSize: 14 }}>
-                  {location.addressLine}
-                </Text>
-              </VStack>
-              {selectedId === location.id ? (
-                <StatusPill label="Selected" tone="pickup" />
-              ) : null}
-            </HStack>
-          </TapCard>
-        ))}
-      </VStack>
-    </VStack>
-  </GlowPanel>
-);
+}) => {
+  const deferredQuery = useDeferredValue(query);
+  const matches = useMemo(() => searchLocations(deferredQuery), [deferredQuery]);
 
-export default function CustomerHomeScreen() {
+  return (
+    <GlowPanel>
+      <SectionHeader
+        title={title}
+        detail="Search from the current launch stops while the SaaSignal-backed web map stays centered on the route."
+      />
+      <VStack gap="$3" style={{ marginTop: 18 }}>
+        <Input
+          style={{
+            backgroundColor: "rgba(10, 15, 32, 0.86)",
+            borderColor: palette.border,
+          }}
+        >
+          <InputField
+            value={query}
+            onChangeText={onChangeQuery}
+            placeholder="Type Nyhavn, Tivoli, Opera..."
+            color={palette.text}
+            placeholderTextColor={palette.textMuted}
+          />
+        </Input>
+        <VStack gap="$3">
+          {matches.slice(0, 4).map((location) => {
+            const isSelected = location.id === selectedId;
+
+            return (
+              <TapCard key={location.id} onPress={() => onSelect(location)}>
+                <HStack justifyContent="space-between" alignItems="center" gap="$4">
+                  <VStack flex={1} gap="$1">
+                    <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
+                      {location.label}
+                    </Text>
+                    <Text style={{ color: palette.textMuted, fontSize: 14 }}>
+                      {location.addressLine}
+                    </Text>
+                  </VStack>
+                  {isSelected ? <StatusPill label="Selected" tone="pickup" /> : null}
+                </HStack>
+              </TapCard>
+            );
+          })}
+        </VStack>
+      </VStack>
+    </GlowPanel>
+  );
+};
+
+export default function CustomerScreen() {
   const queryClient = useQueryClient();
-  const { isLoading, session, sessionToken } = useSession();
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhoneNumber, setCustomerPhoneNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [priority, setPriority] = useState<"normal" | "priority">("normal");
+  const { isLoading, session, sessionToken, switchRole } = useSession();
   const [pickupQuery, setPickupQuery] = useState(locationPresets[0]!.label);
   const [dropoffQuery, setDropoffQuery] = useState(locationPresets[3]!.label);
   const [selectedPickup, setSelectedPickup] = useState(locationPresets[0]!);
   const [selectedDropoff, setSelectedDropoff] = useState(locationPresets[3]!);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhoneNumber, setCustomerPhoneNumber] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const deferredPickupQuery = useDeferredValue(pickupQuery);
-  const deferredDropoffQuery = useDeferredValue(dropoffQuery);
-  const pickupMatches = useMemo(
-    () => searchLocations(deferredPickupQuery),
-    [deferredPickupQuery],
-  );
-  const dropoffMatches = useMemo(
-    () => searchLocations(deferredDropoffQuery),
-    [deferredDropoffQuery],
-  );
+  useEffect(() => {
+    if (!customerName && session?.user.name) {
+      setCustomerName(session.user.name);
+    }
+  }, [customerName, session?.user.name]);
 
   const currentOrderQuery = useQuery({
     queryKey: ["customer-order", sessionToken],
     enabled: Boolean(sessionToken) && session?.activeRole === "customer",
     queryFn: () => api.fetchCurrentCustomerOrder(sessionToken),
-    refetchInterval: 7_000,
+    refetchInterval: 8_000,
   });
 
   const createOrderMutation = useMutation({
     mutationFn: () =>
       api.createCustomerOrder(
         buildComposerOrderInput({
-          customerName,
+          customerName: customerName.trim() || session?.user.name || "Customer",
           customerPhoneNumber,
           notes,
-          priority,
+          priority: "normal",
           pickup: selectedPickup,
           dropoff: selectedDropoff,
         }),
@@ -150,24 +148,22 @@ export default function CustomerHomeScreen() {
     },
   });
 
-  useEffect(() => {
-    if (!session?.user.name) {
-      return;
-    }
+  const activeOrder = currentOrderQuery.data ?? createOrderMutation.data ?? null;
+  const statusCopy = activeOrder ? orderStatusCopy[activeOrder.order.status] : null;
+  const composerMap = buildPairMap(
+    toAddressPoint(selectedPickup),
+    toAddressPoint(selectedDropoff),
+  );
 
-    setCustomerName((current) => current || session.user.name);
-  }, [session?.user.name]);
-
   useEffect(() => {
-    const order = currentOrderQuery.data;
-    const trackingToken = order?.order.trackingToken;
+    const trackingToken = activeOrder?.order.trackingToken;
 
     if (!trackingToken) {
       return;
     }
 
-    let dispose: () => void = () => undefined;
     let cancelled = false;
+    let dispose: () => void = () => undefined;
 
     void api
       .fetchTrackingRealtimeCredentials(trackingToken)
@@ -177,7 +173,7 @@ export default function CustomerHomeScreen() {
         }
 
         dispose = bindWebEventSource(credentials.subscribeUrl, () => {
-          void queryClient.invalidateQueries({ queryKey: ["customer-order", sessionToken] });
+          void currentOrderQuery.refetch();
         });
       })
       .catch(() => undefined);
@@ -186,118 +182,218 @@ export default function CustomerHomeScreen() {
       cancelled = true;
       dispose();
     };
-  }, [currentOrderQuery.data, queryClient, sessionToken]);
+  }, [activeOrder?.order.trackingToken, currentOrderQuery.refetch]);
 
   if (!isLoading && !session) {
-    return <Redirect href="/sign-in?next=/customer" />;
-  }
-
-  if (!isLoading && session?.activeRole === "driver") {
-    return <Redirect href="/driver" />;
+    return <Redirect href={{ pathname: "/sign-in", params: { next: "/customer" } }} />;
   }
 
   if (isLoading || !session) {
     return (
       <DispatchScreen>
         <VStack flex={1} justifyContent="center" alignItems="center">
-          <Text color={palette.textMuted}>Loading customer session...</Text>
+          <Text color={palette.textMuted}>Loading customer dispatch...</Text>
         </VStack>
       </DispatchScreen>
     );
   }
 
-  const currentOrder = currentOrderQuery.data;
-  const customerMap =
-    selectedPickup && selectedDropoff
-      ? buildPairMap(toAddressPoint(selectedPickup), toAddressPoint(selectedDropoff))
-      : previewMap;
-  const composerMarkers = [
-    selectedPickup
-      ? {
-          stop: {
-            kind: "pickup" as const,
-            label: "Pickup",
-            point: selectedPickup.point,
-          },
-          emphasized: true,
-        }
-      : null,
-    selectedDropoff
-      ? {
-          stop: {
-            kind: "dropoff" as const,
-            label: "Dropoff",
-            point: selectedDropoff.point,
-          },
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    stop: {
-      kind: "pickup" | "dropoff";
-      label: string;
-      point: { latitude: number; longitude: number };
-    };
-    emphasized?: boolean;
-  }>;
+  if (session.activeRole !== "customer") {
+    return (
+      <DispatchScreen>
+        <VStack flex={1} justifyContent="center" gap="$4">
+          <GlowPanel tone="pickup">
+            <SectionHeader
+              title="Customer mode is not active"
+              detail="This account can order, but the active role needs to switch back to customer."
+            />
+            <Box style={{ marginTop: 18 }}>
+              <GlowButton onPress={() => void switchRole("customer")}>
+                Switch to customer
+              </GlowButton>
+            </Box>
+          </GlowPanel>
+        </VStack>
+      </DispatchScreen>
+    );
+  }
 
   return (
     <DispatchScreen padded={false}>
       <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
-        <Box style={{ paddingHorizontal: 20, paddingTop: 24 }}>
-          {currentOrder ? (
-            <VStack gap="$4" style={{ marginBottom: 20 }}>
-              <VStack gap="$2">
-                <Eyebrow>Customer operation</Eyebrow>
+        <LinearGradient
+          colors={["#040711", "#08111E", "#0F1B2D"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 26 }}
+        >
+          <VStack gap="$5">
+            <VStack gap="$3">
+              <Eyebrow>Customer Dispatch</Eyebrow>
+              <HeroTitle>
+                {activeOrder
+                  ? "The live run stays on this map until the order closes."
+                  : "Set pickup and dropoff first. The city map frames the route before you send it."}
+              </HeroTitle>
+              <SupportingText>
+                {activeOrder
+                  ? "Waiting, assignment, and live tracking all stay inside the same surface so the customer never loses context."
+                  : "This is a customer-first map composer. Sign-in unlocks request creation and public tracking sharing without leaving the app shell."}
+              </SupportingText>
+            </VStack>
+
+            <NightCityMap
+              map={activeOrder?.tracking.map ?? composerMap}
+              title={activeOrder ? statusCopy?.label : "Order composer"}
+              subtitle={
+                activeOrder
+                  ? statusCopy?.detail
+                  : "Pickup and dropoff markers stay bright while the route overlay previews the active leg."
+              }
+              markers={activeOrder ? buildTrackingMarkers(activeOrder.tracking) : undefined}
+              height={460}
+            />
+
+            <HStack gap="$5" flexWrap="wrap">
+              <MetricRow
+                label="Role"
+                value={session.activeRole}
+              />
+              <MetricRow
+                label={activeOrder ? "ETA" : "Draft ETA"}
+                value={formatEta((activeOrder?.tracking.map ?? composerMap).etaMinutes)}
+              />
+              <MetricRow
+                label={activeOrder ? "Status" : "Route"}
+                value={
+                  activeOrder
+                    ? activeOrder.order.status.replaceAll("_", " ")
+                    : `${selectedPickup.label} → ${selectedDropoff.label}`
+                }
+              />
+            </HStack>
+          </VStack>
+        </LinearGradient>
+
+        <VStack gap="$4" style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+          {activeOrder ? (
+            <>
+              <GlowPanel tone="driver">
                 <SectionHeader
-                  title="Your live order"
-                  detail="The same map persists from request creation through completion."
+                  title="Live order state"
+                  detail="Dispatch updates this panel as the driver accepts, travels to pickup, and completes the route."
                   right={
                     <StatusPill
-                      label={currentOrder.order.status.replaceAll("_", " ")}
-                      tone="driver"
+                      label={activeOrder.order.status.replaceAll("_", " ")}
+                      tone={
+                        activeOrder.order.status === "picked_up"
+                          ? "dropoff"
+                          : activeOrder.order.status === "accepted" ||
+                              activeOrder.order.status === "on_the_way"
+                            ? "driver"
+                            : "pickup"
+                      }
                     />
                   }
                 />
-              </VStack>
+                <HStack gap="$4" alignItems="center" style={{ marginTop: 18 }}>
+                  <Avatar size="md" style={{ backgroundColor: "#1B2239" }}>
+                    <AvatarFallbackText>
+                      {activeOrder.tracking.driver?.name ?? "Queue"}
+                    </AvatarFallbackText>
+                  </Avatar>
+                  <VStack flex={1} gap="$1">
+                    <Text style={{ color: palette.text, fontSize: 18, fontWeight: "700" }}>
+                      {activeOrder.tracking.driver?.name ?? "Dispatch matching"}
+                    </Text>
+                    <Text style={{ color: palette.textMuted, fontSize: 14 }}>
+                      {activeOrder.tracking.driver?.vehicleLabel ??
+                        "A qualified nearby driver will appear here once the offer is accepted."}
+                    </Text>
+                    <Text style={{ color: palette.driver, fontSize: 14, fontWeight: "700" }}>
+                      ETA {formatEta(activeOrder.tracking.map.etaMinutes)}
+                    </Text>
+                  </VStack>
+                </HStack>
+                <HStack gap="$3" flexWrap="wrap" style={{ marginTop: 18 }}>
+                  <GlowButton onPress={() => void Linking.openURL(activeOrder.shareUrl)}>
+                    Open public tracker
+                  </GlowButton>
+                  <GlowButton
+                    tone="secondary"
+                    variant="outline"
+                    onPress={() => void currentOrderQuery.refetch()}
+                  >
+                    Refresh order
+                  </GlowButton>
+                </HStack>
+              </GlowPanel>
 
-              <TrackingScene
-                title="Live route"
-                subtitle={orderStatusCopy[currentOrder.order.status].detail}
-                tracking={currentOrder.tracking}
-                shareUrl={currentOrder.shareUrl}
-                actionLabel="Open public tracker"
-              />
-
-              {currentOrder.order.status === "pending_assignment" ||
-              currentOrder.order.status === "offer_sent" ? (
-                <GlowPanel tone="pickup">
-                  <SectionHeader
-                    title="Dispatch in progress"
-                    detail="The backend is ranking nearby drivers, then sending concurrent offers."
-                  />
-                  <Text style={{ marginTop: 16, color: palette.textMuted, fontSize: 16 }}>
-                    Current ETA target: {formatEta(currentOrder.tracking.map.etaMinutes)}
-                  </Text>
-                </GlowPanel>
-              ) : null}
-            </VStack>
-          ) : (
-            <VStack gap="$4" style={{ marginBottom: 20 }}>
-              <NightCityMap
-                map={customerMap}
-                title="Create a new order"
-                subtitle="Choose pickup and dropoff, then submit once. The map becomes the live tracker after dispatch."
-                height={420}
-                markers={composerMarkers}
-              />
+              <GlowPanel>
+                <SectionHeader
+                  title="Route timeline"
+                  detail="Every state transition lands here in timestamp order."
+                />
+                <Box style={{ marginTop: 16 }}>
+                  <OrderTimeline events={activeOrder.tracking.timeline} />
+                </Box>
+              </GlowPanel>
 
               <GlowPanel tone="pickup">
                 <SectionHeader
-                  title={`Welcome back, ${session.user.name}`}
-                  detail="Customer mode is active. Your next request will stay pinned to the live map."
-                  right={<StatusPill label="Customer" tone="pickup" />}
+                  title="Stops"
+                  detail="The dominant stop and route leg come directly from the tracking payload."
                 />
-                <VStack gap="$3" style={{ marginTop: 16 }}>
+                <VStack gap="$4" style={{ marginTop: 16 }}>
+                  <VStack gap="$1">
+                    <Text style={{ color: palette.pickup, fontSize: 12, letterSpacing: 2, textTransform: "uppercase" }}>
+                      Pickup
+                    </Text>
+                    <Text style={{ color: palette.text, fontSize: 18, fontWeight: "700" }}>
+                      {activeOrder.order.pickup.addressLine}
+                    </Text>
+                  </VStack>
+                  <VStack gap="$1">
+                    <Text style={{ color: palette.dropoff, fontSize: 12, letterSpacing: 2, textTransform: "uppercase" }}>
+                      Dropoff
+                    </Text>
+                    <Text style={{ color: palette.text, fontSize: 18, fontWeight: "700" }}>
+                      {activeOrder.order.dropoff.addressLine}
+                    </Text>
+                  </VStack>
+                </VStack>
+              </GlowPanel>
+            </>
+          ) : (
+            <>
+              <LocationPicker
+                title="Pickup location"
+                query={pickupQuery}
+                selectedId={selectedPickup.id}
+                onChangeQuery={setPickupQuery}
+                onSelect={(location) => {
+                  setSelectedPickup(location);
+                  setPickupQuery(location.label);
+                }}
+              />
+
+              <LocationPicker
+                title="Dropoff location"
+                query={dropoffQuery}
+                selectedId={selectedDropoff.id}
+                onChangeQuery={setDropoffQuery}
+                onSelect={(location) => {
+                  setSelectedDropoff(location);
+                  setDropoffQuery(location.label);
+                }}
+              />
+
+              <GlowPanel tone="driver">
+                <SectionHeader
+                  title="Customer details"
+                  detail="This sheet stays tight: name, phone, notes, then dispatch."
+                />
+                <VStack gap="$3" style={{ marginTop: 18 }}>
                   <Input style={{ backgroundColor: "transparent", borderColor: palette.border }}>
                     <InputField
                       value={customerName}
@@ -311,89 +407,39 @@ export default function CustomerHomeScreen() {
                     <InputField
                       value={customerPhoneNumber}
                       onChangeText={setCustomerPhoneNumber}
-                      placeholder="Phone number"
                       keyboardType="phone-pad"
+                      placeholder="Phone number"
                       color={palette.text}
                       placeholderTextColor={palette.textMuted}
                     />
                   </Input>
-                  <Textarea style={{ backgroundColor: "transparent", borderColor: palette.border }}>
-                    <TextareaInput
+                  <Input style={{ backgroundColor: "transparent", borderColor: palette.border }}>
+                    <InputField
                       value={notes}
                       onChangeText={setNotes}
-                      placeholder="Pickup notes, gate code, or landmark"
+                      placeholder="Door code, pickup notes, building instructions..."
                       color={palette.text}
                       placeholderTextColor={palette.textMuted}
                     />
-                  </Textarea>
+                  </Input>
                 </VStack>
-
-                <VStack gap="$3" style={{ marginTop: 20 }}>
-                  <Text style={{ color: palette.textMuted, fontSize: 14 }}>
-                    Priority mode
-                  </Text>
-                  {priorityModes.map((mode) => (
-                    <TapCard key={mode.value} onPress={() => setPriority(mode.value)}>
-                      <HStack justifyContent="space-between" alignItems="center" gap="$4">
-                        <VStack flex={1} gap="$1">
-                          <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
-                            {mode.label}
-                          </Text>
-                          <Text style={{ color: palette.textMuted, fontSize: 14 }}>
-                            {mode.detail}
-                          </Text>
-                        </VStack>
-                        {priority === mode.value ? (
-                          <StatusPill
-                            label={mode.value === "priority" ? "Fastest" : "Balanced"}
-                            tone={mode.value === "priority" ? "dropoff" : "pickup"}
-                          />
-                        ) : null}
-                      </HStack>
-                    </TapCard>
-                  ))}
-                </VStack>
-
                 <Box style={{ marginTop: 20 }}>
                   <GlowButton
                     onPress={() => createOrderMutation.mutate()}
                     isLoading={createOrderMutation.isPending}
                   >
-                    Send order to dispatch
+                    Send order into dispatch
                   </GlowButton>
                 </Box>
+                {createOrderMutation.error ? (
+                  <Text style={{ color: palette.dropoff, marginTop: 16 }}>
+                    {createOrderMutation.error.message}
+                  </Text>
+                ) : null}
               </GlowPanel>
-
-              <LocationPicker
-                title="Pickup search"
-                value={pickupQuery}
-                onChangeText={setPickupQuery}
-                matches={pickupMatches}
-                selectedId={selectedPickup.id}
-                onSelect={(location) => {
-                  setSelectedPickup(location);
-                  setPickupQuery(location.label);
-                }}
-              />
-
-              <LocationPicker
-                title="Dropoff search"
-                value={dropoffQuery}
-                onChangeText={setDropoffQuery}
-                matches={dropoffMatches}
-                selectedId={selectedDropoff.id}
-                onSelect={(location) => {
-                  setSelectedDropoff(location);
-                  setDropoffQuery(location.label);
-                }}
-              />
-            </VStack>
+            </>
           )}
-
-          <GlowButton tone="ghost" variant="outline" onPress={() => router.push("/settings")}>
-            Open account and role settings
-          </GlowButton>
-        </Box>
+        </VStack>
       </ScrollView>
     </DispatchScreen>
   );

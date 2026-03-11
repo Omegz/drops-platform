@@ -1,4 +1,6 @@
-import app from "../src/app.js";
+import bundledApp from "../dist/app.cjs";
+
+const app = (bundledApp as { default?: { fetch: typeof fetch } }).default ?? bundledApp;
 
 export default {
   async fetch(request: Request) {

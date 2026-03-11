@@ -16,6 +16,34 @@ export const AddressPointSchema = z.object({
   point: CoordinateSchema,
 });
 
+export const LogisticsPlaceSearchInputSchema = z.object({
+  query: z.string().min(1).max(500),
+  limit: z.number().int().min(1).max(10).optional(),
+  proximity: CoordinateSchema.optional(),
+});
+
+export const LogisticsPlaceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  addressLine: z.string(),
+  point: CoordinateSchema,
+  source: z.enum(["saasignal-geocoding", "saasignal-geo-entity", "local-fallback"]),
+  kind: z.enum(["address", "geo_entity"]),
+  entityType: z.string().optional(),
+  externalId: z.string().optional(),
+  googleMapsUrl: z.string().url().optional(),
+});
+
+export const LogisticsPlaceSearchResultSchema = z.object({
+  provider: z.string(),
+  places: z.array(LogisticsPlaceSchema),
+});
+
+export const RoutePreviewInputSchema = z.object({
+  pickup: AddressPointSchema,
+  dropoff: AddressPointSchema,
+});
+
 export const AppRoleSchema = z.enum(["customer", "driver", "admin"]);
 export const DriverAvailabilitySchema = z.enum(["offline", "online"]);
 export const OrderStatusSchema = z.enum([
@@ -299,6 +327,10 @@ export const ApiEnvelopeSchema = <T extends z.ZodTypeAny>(schema: T) =>
 export type Coordinate = z.infer<typeof CoordinateSchema>;
 export type Bounds = z.infer<typeof BoundsSchema>;
 export type AddressPoint = z.infer<typeof AddressPointSchema>;
+export type LogisticsPlaceSearchInput = z.infer<typeof LogisticsPlaceSearchInputSchema>;
+export type LogisticsPlace = z.infer<typeof LogisticsPlaceSchema>;
+export type LogisticsPlaceSearchResult = z.infer<typeof LogisticsPlaceSearchResultSchema>;
+export type RoutePreviewInput = z.infer<typeof RoutePreviewInputSchema>;
 export type AppRole = z.infer<typeof AppRoleSchema>;
 export type AuthProviderStatus = z.infer<typeof AuthProviderStatusSchema>;
 export type User = z.infer<typeof UserSchema>;

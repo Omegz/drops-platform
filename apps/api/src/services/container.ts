@@ -36,6 +36,7 @@ const logisticsService = new SaaSignalLogisticsService(
 
 export const roleService = new RoleService(authRepository);
 export const authService = new AuthService(authRepository, roleService);
+export { logisticsService };
 export const dispatchService = new DispatchService(
   dispatchRepository,
   pushService,

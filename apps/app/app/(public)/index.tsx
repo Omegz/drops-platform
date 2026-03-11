@@ -1,4 +1,5 @@
 import { Redirect, router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { Box, HStack, ScrollView, Text, VStack } from "@gluestack-ui/themed";
 import { NightCityMap } from "@drops/maps";
@@ -13,34 +14,43 @@ import {
   SupportingText,
   palette,
 } from "@drops/ui";
-import { buildTrackingMarkers, previewMap } from "@/lib/dispatch-data";
+import { api } from "@/lib/api";
+import {
+  buildTrackingMarkers,
+  defaultPlaces,
+  previewMap,
+  toAddressPoint,
+} from "@/lib/dispatch-data";
 import { useSession } from "@/lib/session";
-
-const previewTrackingMarkers = buildTrackingMarkers({
-  orderId: "preview",
-  status: "offer_sent",
-  trackingUrl: "https://drops.example/track/demo",
-  pickup: {
-    addressLine: "Nyhavn 1, Copenhagen",
-    point: { latitude: 55.6799, longitude: 12.5911 },
-  },
-  dropoff: {
-    addressLine: "Opera House, Copenhagen",
-    point: { latitude: 55.6826, longitude: 12.6006 },
-  },
-  driver: {
-    id: "drv_preview",
-    name: "Sara Nielsen",
-    vehicleLabel: "Bike 4",
-    point: { latitude: 55.6841, longitude: 12.5814 },
-    updatedAt: new Date().toISOString(),
-  },
-  timeline: [],
-  map: previewMap,
-});
 
 export default function LandingScreen() {
   const { isLoading, session } = useSession();
+  const previewMapQuery = useQuery({
+    queryKey: ["landing-route-preview"],
+    queryFn: () =>
+      api.fetchRoutePreview({
+        pickup: toAddressPoint(defaultPlaces[0]!),
+        dropoff: toAddressPoint(defaultPlaces[3]!),
+      }),
+    staleTime: 60_000,
+  });
+  const livePreviewMap = previewMapQuery.data ?? previewMap;
+  const previewTrackingMarkers = buildTrackingMarkers({
+    orderId: "preview",
+    status: "offer_sent",
+    trackingUrl: "https://drops.example/track/demo",
+    pickup: toAddressPoint(defaultPlaces[0]!),
+    dropoff: toAddressPoint(defaultPlaces[3]!),
+    driver: {
+      id: "drv_preview",
+      name: "Sara Nielsen",
+      vehicleLabel: "Bike 4",
+      point: { latitude: 55.6841, longitude: 12.5814 },
+      updatedAt: new Date().toISOString(),
+    },
+    timeline: [],
+    map: livePreviewMap,
+  });
 
   if (!isLoading && session) {
     return <Redirect href={session.activeRole === "driver" ? "/driver" : "/customer"} />;
@@ -65,7 +75,7 @@ export default function LandingScreen() {
             </VStack>
 
             <NightCityMap
-              map={previewMap}
+              map={livePreviewMap}
               title="Control room preview"
               subtitle="Pickup, dropoff, and driver movement stay bright on one shared dispatch canvas."
               markers={previewTrackingMarkers}

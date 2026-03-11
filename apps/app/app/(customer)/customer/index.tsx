@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import * as Linking from "expo-linking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,10 +36,11 @@ import {
   buildPairMap,
   buildTrackingMarkers,
   buildComposerOrderInput,
+  defaultPlaces,
+  type DispatchPlace,
   formatEta,
-  locationPresets,
   orderStatusCopy,
-  searchLocations,
+  searchSeedPlaces,
   toAddressPoint,
 } from "@/lib/dispatch-data";
 
@@ -47,23 +48,48 @@ const LocationPicker = ({
   title,
   query,
   selectedId,
+  proximity,
   onChangeQuery,
   onSelect,
 }: {
   title: string;
   query: string;
   selectedId: string;
+  proximity?: DispatchPlace;
   onChangeQuery: (value: string) => void;
-  onSelect: (location: (typeof locationPresets)[number]) => void;
+  onSelect: (location: DispatchPlace) => void;
 }) => {
   const deferredQuery = useDeferredValue(query);
-  const matches = useMemo(() => searchLocations(deferredQuery), [deferredQuery]);
+  const placesQuery = useQuery({
+    queryKey: [
+      "logistics-places",
+      deferredQuery.trim().toLowerCase(),
+      proximity?.point.latitude ?? null,
+      proximity?.point.longitude ?? null,
+    ],
+    enabled: deferredQuery.trim().length >= 2,
+    queryFn: () =>
+      api.searchLogisticsPlaces({
+        query: deferredQuery.trim(),
+        limit: 6,
+        proximity: proximity?.point,
+      }),
+    staleTime: 30_000,
+  });
+  const matches =
+    deferredQuery.trim().length < 2
+      ? defaultPlaces
+      : placesQuery.data?.places.length
+        ? placesQuery.data.places
+        : placesQuery.isError
+          ? searchSeedPlaces(deferredQuery)
+          : [];
 
   return (
     <GlowPanel>
       <SectionHeader
         title={title}
-        detail="Search from the current launch stops while the SaaSignal-backed web map stays centered on the route."
+        detail="Search flows through SaaSignal geocoding and geo entities, with the map preview updating from the same logistics layer."
       />
       <VStack gap="$3" style={{ marginTop: 18 }}>
         <Input
@@ -80,6 +106,11 @@ const LocationPicker = ({
             placeholderTextColor={palette.textMuted}
           />
         </Input>
+        {placesQuery.isFetching ? (
+          <Text style={{ color: palette.textMuted, fontSize: 13 }}>
+            Searching SaaSignal places...
+          </Text>
+        ) : null}
         <VStack gap="$3">
           {matches.slice(0, 4).map((location) => {
             const isSelected = location.id === selectedId;
@@ -109,10 +140,10 @@ const LocationPicker = ({
 export default function CustomerScreen() {
   const queryClient = useQueryClient();
   const { isLoading, session, sessionToken, switchRole } = useSession();
-  const [pickupQuery, setPickupQuery] = useState(locationPresets[0]!.label);
-  const [dropoffQuery, setDropoffQuery] = useState(locationPresets[3]!.label);
-  const [selectedPickup, setSelectedPickup] = useState(locationPresets[0]!);
-  const [selectedDropoff, setSelectedDropoff] = useState(locationPresets[3]!);
+  const [pickupQuery, setPickupQuery] = useState(defaultPlaces[0]!.label);
+  const [dropoffQuery, setDropoffQuery] = useState(defaultPlaces[3]!.label);
+  const [selectedPickup, setSelectedPickup] = useState<DispatchPlace>(defaultPlaces[0]!);
+  const [selectedDropoff, setSelectedDropoff] = useState<DispatchPlace>(defaultPlaces[3]!);
   const [customerName, setCustomerName] = useState("");
   const [customerPhoneNumber, setCustomerPhoneNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -147,13 +178,30 @@ export default function CustomerScreen() {
       queryClient.setQueryData(["customer-order", sessionToken], value);
     },
   });
-
   const activeOrder = currentOrderQuery.data ?? createOrderMutation.data ?? null;
   const statusCopy = activeOrder ? orderStatusCopy[activeOrder.order.status] : null;
-  const composerMap = buildPairMap(
-    toAddressPoint(selectedPickup),
-    toAddressPoint(selectedDropoff),
-  );
+  const previewMapQuery = useQuery({
+    queryKey: [
+      "customer-route-preview",
+      selectedPickup.id,
+      selectedDropoff.id,
+      selectedPickup.point.latitude,
+      selectedPickup.point.longitude,
+      selectedDropoff.point.latitude,
+      selectedDropoff.point.longitude,
+    ],
+    enabled: !activeOrder,
+    queryFn: () =>
+      api.fetchRoutePreview({
+        pickup: toAddressPoint(selectedPickup),
+        dropoff: toAddressPoint(selectedDropoff),
+      }),
+    staleTime: 30_000,
+  });
+
+  const composerMap =
+    previewMapQuery.data ??
+    buildPairMap(toAddressPoint(selectedPickup), toAddressPoint(selectedDropoff));
 
   useEffect(() => {
     const trackingToken = activeOrder?.order.trackingToken;
@@ -370,6 +418,7 @@ export default function CustomerScreen() {
                 title="Pickup location"
                 query={pickupQuery}
                 selectedId={selectedPickup.id}
+                proximity={selectedDropoff}
                 onChangeQuery={setPickupQuery}
                 onSelect={(location) => {
                   setSelectedPickup(location);
@@ -381,6 +430,7 @@ export default function CustomerScreen() {
                 title="Dropoff location"
                 query={dropoffQuery}
                 selectedId={selectedDropoff.id}
+                proximity={selectedPickup}
                 onChangeQuery={setDropoffQuery}
                 onSelect={(location) => {
                   setSelectedDropoff(location);

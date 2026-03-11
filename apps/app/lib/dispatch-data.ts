@@ -4,6 +4,7 @@ import type {
   Coordinate,
   CreateOrderInput,
   CreatePublicOrderInput,
+  LogisticsPlace,
   Offer,
   OrderStatus,
   TaskMap,
@@ -11,21 +12,19 @@ import type {
 } from "@drops/contracts";
 import { buildSyntheticRoute } from "@drops/maps";
 
-export type LocationPreset = {
-  id: string;
-  label: string;
-  subtitle: string;
-  addressLine: string;
-  point: Coordinate;
+export type DispatchPlace = LogisticsPlace & {
+  subtitle?: string;
 };
 
-export const locationPresets: LocationPreset[] = [
+export const defaultPlaces: DispatchPlace[] = [
   {
     id: "nyhavn",
     label: "Nyhavn Harbor",
     subtitle: "Canal edge pickup",
     addressLine: "Nyhavn 1, Copenhagen",
     point: { latitude: 55.6799, longitude: 12.5911 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "norreport",
@@ -33,6 +32,8 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "High-volume transfer hub",
     addressLine: "Norre Voldgade 90, Copenhagen",
     point: { latitude: 55.6834, longitude: 12.5717 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "tivoli",
@@ -40,6 +41,8 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "Central guest entrance",
     addressLine: "Vesterbrogade 3, Copenhagen",
     point: { latitude: 55.6736, longitude: 12.5681 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "opera",
@@ -47,6 +50,8 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "Waterfront destination",
     addressLine: "Ekvipagemestervej 10, Copenhagen",
     point: { latitude: 55.6826, longitude: 12.6006 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "drbyen",
@@ -54,6 +59,8 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "Amager pickup zone",
     addressLine: "Emil Holms Kanal 20, Copenhagen",
     point: { latitude: 55.6634, longitude: 12.5855 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "refshaleoen",
@@ -61,6 +68,8 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "Creative district",
     addressLine: "Refshalevej 167A, Copenhagen",
     point: { latitude: 55.6921, longitude: 12.6188 },
+    source: "local-fallback",
+    kind: "address",
   },
   {
     id: "bella",
@@ -68,8 +77,12 @@ export const locationPresets: LocationPreset[] = [
     subtitle: "South city conference zone",
     addressLine: "Center Boulevard 5, Copenhagen",
     point: { latitude: 55.6372, longitude: 12.5788 },
+    source: "local-fallback",
+    kind: "address",
   },
 ];
+
+export const locationPresets = defaultPlaces;
 
 export const previewMap: TaskMap = {
   activeLeg: "to_pickup",
@@ -77,18 +90,18 @@ export const previewMap: TaskMap = {
   primaryStop: {
     kind: "pickup",
     label: "Pickup",
-    point: locationPresets[0]!.point,
+    point: defaultPlaces[0]!.point,
   },
   secondaryStop: {
     kind: "dropoff",
     label: "Dropoff",
-    point: locationPresets[3]!.point,
+    point: defaultPlaces[3]!.point,
   },
   route: {
-    provider: "saasignal-logistics",
+    provider: "local-fallback",
     etaMinutes: 8,
     distanceKm: 4.1,
-    points: buildSyntheticRoute(locationPresets[0]!.point, locationPresets[3]!.point),
+    points: buildSyntheticRoute(defaultPlaces[0]!.point, defaultPlaces[3]!.point),
   },
   bounds: {
     northEast: { latitude: 55.6926, longitude: 12.6022 },
@@ -96,14 +109,14 @@ export const previewMap: TaskMap = {
   },
 };
 
-export const searchLocations = (query: string) => {
+export const searchSeedPlaces = (query: string) => {
   const normalized = query.trim().toLowerCase();
 
   if (!normalized) {
-    return locationPresets;
+    return defaultPlaces;
   }
 
-  return locationPresets.filter((location) =>
+  return defaultPlaces.filter((location) =>
     [location.label, location.subtitle, location.addressLine]
       .join(" ")
       .toLowerCase()
@@ -112,7 +125,7 @@ export const searchLocations = (query: string) => {
 };
 
 export const toAddressPoint = (
-  location: LocationPreset,
+  location: DispatchPlace,
   instructions?: string,
 ): AddressPoint => ({
   addressLine: location.addressLine,
@@ -132,8 +145,8 @@ export const buildComposerOrderInput = ({
   customerPhoneNumber: string;
   notes: string;
   priority: CreateOrderInput["priority"];
-  pickup: LocationPreset;
-  dropoff: LocationPreset;
+  pickup: DispatchPlace;
+  dropoff: DispatchPlace;
 }): CreateOrderInput => ({
   customerName,
   customerPhoneNumber: customerPhoneNumber.trim() || undefined,
@@ -149,8 +162,8 @@ export const buildPublicComposerOrderInput = ({
   notes,
   priority,
 }: {
-  pickup: LocationPreset;
-  dropoff: LocationPreset;
+  pickup: DispatchPlace;
+  dropoff: DispatchPlace;
   notes?: string;
   priority: CreatePublicOrderInput["priority"];
 }): CreatePublicOrderInput => ({
@@ -192,7 +205,7 @@ export const buildPairMap = (
       point: activeLeg === "to_dropoff" ? pickup.point : dropoff.point,
     },
     route: {
-      provider: "saasignal-logistics",
+      provider: "local-fallback",
       etaMinutes: activeLeg === "to_dropoff" ? 14 : 8,
       distanceKm: activeLeg === "to_dropoff" ? 6.8 : 3.9,
       points,
@@ -218,7 +231,7 @@ export const buildIdleMap = (point?: Coordinate | null): TaskMap => {
     },
     secondaryStop: null,
     route: {
-      provider: "saasignal-logistics",
+      provider: "local-fallback",
       etaMinutes: null,
       distanceKm: 2.4,
       points: routePoints,

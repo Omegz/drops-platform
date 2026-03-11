@@ -1,7 +1,9 @@
 import type {
+  AddressPoint,
   Coordinate,
   DispatchCandidate,
   Driver,
+  LogisticsPlaceSearchResult,
   Order,
   TaskMap,
   TrackingDriver,
@@ -31,6 +33,16 @@ const buildRoutePoints = (start: Coordinate, end: Coordinate): Coordinate[] => {
 };
 
 const toEtaMinutes = (distanceKm: number) => Math.max(3, Math.round((distanceKm / 0.42) * 10) / 10);
+const buildBounds = (points: Coordinate[]) => ({
+  northEast: {
+    latitude: Math.max(...points.map((point) => point.latitude)),
+    longitude: Math.max(...points.map((point) => point.longitude)),
+  },
+  southWest: {
+    latitude: Math.min(...points.map((point) => point.latitude)),
+    longitude: Math.min(...points.map((point) => point.longitude)),
+  },
+});
 
 const hasTrackingPoint = (
   driver: DriverPointCarrier,
@@ -41,6 +53,35 @@ export class SaaSignalLogisticsService {
     private readonly providerLabel = "saasignal-logistics",
     private readonly saasignalService: SaaSignalDispatchService | null = null,
   ) {}
+
+  async searchPlaces(
+    query: string,
+    options: {
+      limit?: number;
+      proximity?: Coordinate;
+      country?: string;
+      language?: string;
+    } = {},
+  ): Promise<LogisticsPlaceSearchResult> {
+    if (!this.saasignalService) {
+      return {
+        provider: "local-fallback",
+        places: [],
+      };
+    }
+
+    try {
+      return {
+        provider: this.providerLabel,
+        places: await this.saasignalService.searchPlaces(query, options),
+      };
+    } catch {
+      return {
+        provider: "local-fallback",
+        places: [],
+      };
+    }
+  }
 
   async rankDrivers(candidates: Driver[], order: Order): Promise<DispatchCandidate[]> {
     if (this.saasignalService) {
@@ -79,6 +120,38 @@ export class SaaSignalLogisticsService {
         };
       })
       .sort((left, right) => left.score - right.score);
+  }
+
+  async buildPreviewMap(pickup: AddressPoint, dropoff: AddressPoint): Promise<TaskMap> {
+    const saasignalRoute = await this.buildSaaSignalRoute(pickup.point, dropoff.point);
+    const distanceKm =
+      saasignalRoute?.distanceKm ?? haversineDistanceKm(pickup.point, dropoff.point);
+    const points = saasignalRoute?.points.length
+      ? saasignalRoute.points
+      : buildRoutePoints(pickup.point, dropoff.point);
+    const etaMinutes = saasignalRoute?.etaMinutes ?? toEtaMinutes(distanceKm);
+
+    return {
+      activeLeg: "to_pickup",
+      etaMinutes,
+      primaryStop: {
+        kind: "pickup",
+        label: "Pickup",
+        point: pickup.point,
+      },
+      secondaryStop: {
+        kind: "dropoff",
+        label: "Dropoff",
+        point: dropoff.point,
+      },
+      route: {
+        provider: saasignalRoute?.provider ?? this.providerLabel,
+        etaMinutes,
+        distanceKm: Number(distanceKm.toFixed(2)),
+        points,
+      },
+      bounds: buildBounds(points),
+    };
   }
 
   async buildTaskMap(order: Order, driver: DriverPointCarrier | null): Promise<TaskMap> {
@@ -164,16 +237,7 @@ export class SaaSignalLogisticsService {
         distanceKm: Number(distanceKm.toFixed(2)),
         points,
       },
-      bounds: {
-        northEast: {
-          latitude: Math.max(...points.map((point) => point.latitude)),
-          longitude: Math.max(...points.map((point) => point.longitude)),
-        },
-        southWest: {
-          latitude: Math.min(...points.map((point) => point.latitude)),
-          longitude: Math.min(...points.map((point) => point.longitude)),
-        },
-      },
+      bounds: buildBounds(points),
     };
   }
 

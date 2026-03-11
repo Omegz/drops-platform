@@ -66,6 +66,10 @@ export class DispatchService {
   async setDriverAvailability(driverId: string, availability: "online" | "offline") {
     const driver = await this.repository.setDriverAvailability(driverId, availability);
 
+    if (this.saasignalService) {
+      await this.saasignalService.syncDriverState(driver).catch(() => undefined);
+    }
+
     await this.publishDriverEvent(driverId, "driver.availability.changed", {
       driverId,
       availability,
@@ -79,7 +83,7 @@ export class DispatchService {
     const activeOrder = await this.repository.getDriverActiveOrder(driverId);
 
     if (this.saasignalService) {
-      await this.saasignalService.trackDriver(driverId, location).catch(() => undefined);
+      await this.saasignalService.trackDriver(driver, location).catch(() => undefined);
     }
 
     await this.publishDriverEvent(driverId, "driver.location.updated", {
@@ -131,6 +135,11 @@ export class DispatchService {
   ): Promise<DispatchDecision> {
     const trackingToken = createId("trk");
     const order = await this.repository.createOrder(input, trackingToken);
+
+    if (this.saasignalService) {
+      await this.saasignalService.syncOrderState(order).catch(() => undefined);
+    }
+
     const candidates = await this.rankCandidates(order);
 
     if (!candidates.length) {
@@ -138,6 +147,11 @@ export class DispatchService {
         order.id,
         "no_driver_found",
       );
+
+      if (this.saasignalService) {
+        await this.saasignalService.syncOrderState(unassignedOrder).catch(() => undefined);
+      }
+
       await this.repository.addOrderEvent({
         orderId: order.id,
         status: "no_driver_found",
@@ -273,6 +287,11 @@ export class DispatchService {
     );
 
     const assignedOrder = await this.repository.assignOrder(orderId, driverId);
+
+    if (this.saasignalService) {
+      await this.saasignalService.syncOrderState(assignedOrder).catch(() => undefined);
+    }
+
     await this.repository.addOrderEvent({
       orderId,
       status: "accepted",
@@ -308,6 +327,11 @@ export class DispatchService {
     }
 
     const updatedOrder = await this.repository.updateOrderStatus(orderId, update.status);
+
+    if (this.saasignalService) {
+      await this.saasignalService.syncOrderState(updatedOrder).catch(() => undefined);
+    }
+
     await this.repository.addOrderEvent({
       orderId,
       status: update.status,

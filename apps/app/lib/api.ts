@@ -8,9 +8,13 @@ import type {
   DriverDeviceRegistration,
   DriverInvitation,
   DriverLocationUpdate,
+  LogisticsPlaceSearchInput,
+  LogisticsPlaceSearchResult,
   MagicLinkRequest,
   MagicLinkResponse,
+  RoutePreviewInput,
   SessionState,
+  TaskMap,
   TrackingSnapshot,
 } from "@drops/contracts";
 import { createAuthHeaders } from "@drops/auth-client";
@@ -111,6 +115,16 @@ export const api = {
       undefined,
       sessionToken,
     ),
+  searchLogisticsPlaces: (input: LogisticsPlaceSearchInput) =>
+    apiFetch<LogisticsPlaceSearchResult>("/api/v1/logistics/places/autocomplete", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  fetchRoutePreview: (input: RoutePreviewInput) =>
+    apiFetch<TaskMap>("/api/v1/logistics/route-preview", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   createCustomerOrder: (input: CreateOrderInput, sessionToken?: string | null) =>
     apiFetch<CustomerOrderView>(
       "/api/v1/customer/orders",

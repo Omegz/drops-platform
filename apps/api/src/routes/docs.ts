@@ -38,6 +38,18 @@ export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
         summary: "Return the current signed-in user, available roles, and active role.",
       },
       {
+        operationId: "autocompleteLogisticsPlaces",
+        method: "POST",
+        path: "/api/v1/logistics/places/autocomplete",
+        summary: "Search SaaSignal geocoding and geo entities for pickup and dropoff places.",
+      },
+      {
+        operationId: "previewLogisticsRoute",
+        method: "POST",
+        path: "/api/v1/logistics/route-preview",
+        summary: "Build a SaaSignal route preview between pickup and dropoff before order creation.",
+      },
+      {
         operationId: "switchActiveRole",
         method: "POST",
         path: "/api/v1/me/active-role",
@@ -121,7 +133,7 @@ export const docsRoutes = new Hono<AppEnv>().get("/docs", (c) =>
       compute: ["Vercel", "SaaSignal channels", "SaaSignal jobs"],
       auth: ["Resend magic links", "Google OAuth", "role-aware bearer sessions"],
       logistics: [
-        "SaaSignal SDK for routing, delivery dispatch, and live tracking",
+        "SaaSignal geo entities, geocoding autocomplete, routing, routing dispatch, and delivery dispatch",
         "Google Maps handoff for driver navigation only",
       ],
     },

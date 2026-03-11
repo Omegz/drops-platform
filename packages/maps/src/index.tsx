@@ -108,6 +108,9 @@ export const NightCityMap = ({
   subtitle,
   onPrimaryPress,
   onSecondaryPress,
+  height = 430,
+  borderRadius = 34,
+  markers,
   children,
 }: PropsWithChildren<{
   map: TaskMap;
@@ -115,13 +118,50 @@ export const NightCityMap = ({
   subtitle?: string;
   onPrimaryPress?: () => void;
   onSecondaryPress?: () => void;
+  height?: number;
+  borderRadius?: number;
+  markers?: Array<{
+    stop: MapStop;
+    emphasized?: boolean;
+    onPress?: () => void;
+  }>;
 }>) => {
   const route = routePoints(map);
   const primaryStop = map.primaryStop;
   const secondaryStop = map.secondaryStop;
+  const resolvedMarkers: Array<{
+    stop: MapStop;
+    emphasized?: boolean;
+    onPress?: () => void;
+  }> = markers ? [...markers] : [];
+
+  if (!markers) {
+    if (primaryStop) {
+      resolvedMarkers.push({
+        stop: primaryStop,
+        emphasized: true,
+        onPress: onPrimaryPress,
+      });
+    }
+
+    if (secondaryStop) {
+      resolvedMarkers.push({
+        stop: secondaryStop,
+        onPress: onSecondaryPress,
+      });
+    }
+  }
 
   return (
-    <View style={styles.shell}>
+    <View
+      style={[
+        styles.shell,
+        {
+          height,
+          borderRadius,
+        },
+      ]}
+    >
       <Svg viewBox="0 0 1000 1000" style={StyleSheet.absoluteFillObject}>
         <Defs>
           <LinearGradient id="routeGlow" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -182,8 +222,14 @@ export const NightCityMap = ({
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
 
-      {primaryStop ? <Marker stop={primaryStop} emphasized onPress={onPrimaryPress} /> : null}
-      {secondaryStop ? <Marker stop={secondaryStop} onPress={onSecondaryPress} /> : null}
+      {resolvedMarkers.map((marker) => (
+        <Marker
+          key={`${marker.stop.kind}:${marker.stop.label}:${marker.stop.point.latitude}:${marker.stop.point.longitude}`}
+          stop={marker.stop}
+          emphasized={marker.emphasized}
+          onPress={marker.onPress}
+        />
+      ))}
       {children ? <View style={styles.childrenLayer}>{children}</View> : null}
     </View>
   );
@@ -245,9 +291,7 @@ const styles = StyleSheet.create({
   shell: {
     backgroundColor: palette.background,
     borderColor: palette.border,
-    borderRadius: 34,
     borderWidth: 1,
-    height: 430,
     overflow: "hidden",
     position: "relative",
   },

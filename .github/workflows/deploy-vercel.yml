@@ -1,0 +1,132 @@
+name: Deploy To Vercel
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Workspace
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  deploy-app:
+    name: Deploy App
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_APP_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Vercel app project link
+        run: |
+          mkdir -p apps/app/.vercel
+          cat > apps/app/.vercel/project.json <<'EOF'
+          {
+            "orgId": "${{ vars.VERCEL_ORG_ID }}",
+            "projectId": "${{ vars.VERCEL_APP_PROJECT_ID }}",
+            "projectName": "drops-app"
+          }
+          EOF
+
+      - name: Pull Vercel app environment
+        working-directory: apps/app
+        run: pnpm exec vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build app on CI runner
+        working-directory: apps/app
+        run: pnpm exec vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy app prebuilt output
+        working-directory: apps/app
+        run: pnpm exec vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  deploy-api:
+    name: Deploy API
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_API_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Vercel API project link
+        run: |
+          mkdir -p apps/api/.vercel
+          cat > apps/api/.vercel/project.json <<'EOF'
+          {
+            "orgId": "${{ vars.VERCEL_ORG_ID }}",
+            "projectId": "${{ vars.VERCEL_API_PROJECT_ID }}",
+            "projectName": "drops-api"
+          }
+          EOF
+
+      - name: Pull Vercel API environment
+        working-directory: apps/api
+        run: pnpm exec vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build API on CI runner
+        working-directory: apps/api
+        run: pnpm exec vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy API prebuilt output
+        working-directory: apps/api
+        run: pnpm exec vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}

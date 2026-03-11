@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Drops Driver",
-    "slug": "drops-driver",
-    "scheme": "drops-driver",
+    "name": "Drops Dispatch",
+    "slug": "drops-dispatch",
+    "scheme": "drops-dispatch",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "plugins": ["expo-router", "expo-location", "expo-notifications"],

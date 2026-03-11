@@ -22,7 +22,7 @@ const base64ToUint8Array = (value: string) => {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 };
 
-export async function registerDriverNotifications(driverId: string) {
+export async function registerDriverNotifications(sessionToken: string) {
   if (Platform.OS === "web") {
     if (
       !("serviceWorker" in navigator) ||
@@ -54,14 +54,17 @@ export async function registerDriverNotifications(driverId: string) {
       return;
     }
 
-    await api.registerDriverDevice(driverId, {
-      platform: "web",
-      endpoint: json.endpoint,
-      keys: {
-        auth: json.keys.auth,
-        p256dh: json.keys.p256dh,
+    await api.registerDriverDevice(
+      {
+        platform: "web",
+        endpoint: json.endpoint,
+        keys: {
+          auth: json.keys.auth,
+          p256dh: json.keys.p256dh,
+        },
       },
-    });
+      sessionToken,
+    );
     return;
   }
 
@@ -94,8 +97,11 @@ export async function registerDriverNotifications(driverId: string) {
     projectId,
   });
 
-  await api.registerDriverDevice(driverId, {
-    platform: "expo",
-    expoPushToken: token.data,
-  });
+  await api.registerDriverDevice(
+    {
+      platform: "expo",
+      expoPushToken: token.data,
+    },
+    sessionToken,
+  );
 }

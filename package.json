@@ -9,7 +9,7 @@
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @drops/api db:migrate",
     "deploy:api": "pnpm --filter @drops/api deploy",
-    "deploy:driver-app": "pnpm --filter @drops/driver-app deploy"
+    "deploy:app": "pnpm --filter @drops/app deploy"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

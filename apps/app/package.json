@@ -1,5 +1,5 @@
 {
-  "name": "@drops/driver-app",
+  "name": "@drops/app",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
@@ -11,7 +11,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@drops/auth-client": "workspace:*",
     "@drops/contracts": "workspace:*",
+    "@drops/maps": "workspace:*",
+    "@drops/ui": "workspace:*",
     "@gluestack-ui/config": "^1.1.20",
     "@gluestack-ui/themed": "^1.1.73",
     "@react-navigation/native": "^7.1.28",

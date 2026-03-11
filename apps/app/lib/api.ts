@@ -1,10 +1,18 @@
 import type {
+  AppRole,
+  CreateOrderInput,
+  CustomerOrderView,
   DriverAvailability,
   DriverDashboard,
   DriverDeviceRegistration,
+  DriverInvitation,
   DriverLocationUpdate,
+  MagicLinkRequest,
+  MagicLinkResponse,
+  SessionState,
   TrackingSnapshot,
 } from "@drops/contracts";
+import { createAuthHeaders } from "@drops/auth-client";
 import { Platform } from "react-native";
 
 const inferApiBaseUrl = () => {
@@ -20,10 +28,12 @@ const inferApiBaseUrl = () => {
     return "";
   }
 
-  return window.location.hostname === "localhost" ? "http://localhost:3000" : "";
+  return ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://localhost:3000"
+    : "";
 };
 
-const API_BASE_URL = inferApiBaseUrl();
+export const API_BASE_URL = inferApiBaseUrl();
 
 type ApiEnvelope<T> = {
   data: T;
@@ -39,19 +49,32 @@ type RealtimeCredentials = {
 class ApiError extends Error {
   constructor(message: string) {
     super(message);
+    this.name = "ApiError";
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+  sessionToken?: string | null,
+): Promise<T> {
+  const hasBody = init?.body !== undefined;
+  const headers = new Headers(init?.headers);
+
+  if (hasBody) {
+    headers.set("content-type", "application/json");
+  }
+
+  for (const [key, value] of Object.entries(createAuthHeaders(sessionToken))) {
+    headers.set(key, value);
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 
-  const payload = await response.json();
+  const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
     throw new ApiError(payload?.error?.message ?? "Request failed");
@@ -61,64 +84,135 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  fetchDriverDashboard: (driverId: string) =>
-    apiFetch<DriverDashboard>(`/api/v1/drivers/${driverId}/dashboard`),
-  setDriverAvailability: (driverId: string, availability: DriverAvailability) =>
-    apiFetch(`/api/v1/drivers/${driverId}/status`, {
+  fetchSessionState: (sessionToken?: string | null) =>
+    apiFetch<SessionState>("/api/auth/session", undefined, sessionToken),
+  requestMagicLink: (payload: MagicLinkRequest) =>
+    apiFetch<MagicLinkResponse>("/api/auth/magic-links/request", {
       method: "POST",
-      body: JSON.stringify(availability),
+      body: JSON.stringify(payload),
     }),
-  updateDriverLocation: (driverId: string, location: DriverLocationUpdate) =>
-    apiFetch(`/api/v1/drivers/${driverId}/location`, {
-      method: "POST",
-      body: JSON.stringify(location),
-    }),
-  registerDriverDevice: (driverId: string, registration: DriverDeviceRegistration) =>
-    apiFetch(`/api/v1/drivers/${driverId}/devices`, {
-      method: "POST",
-      body: JSON.stringify(registration),
-    }),
-  respondToOffer: (driverId: string, orderId: string, decision: "accept" | "reject") =>
+  signOut: (sessionToken?: string | null) =>
+    apiFetch<{ ok: true }>("/api/auth/sign-out", { method: "POST" }, sessionToken),
+  switchActiveRole: (role: AppRole, sessionToken?: string | null) =>
+    apiFetch<SessionState>(
+      "/api/v1/me/active-role",
+      {
+        method: "POST",
+        body: JSON.stringify({ role }),
+      },
+      sessionToken,
+    ),
+  fetchCurrentCustomerOrder: (sessionToken?: string | null) =>
+    apiFetch<CustomerOrderView | null>(
+      "/api/v1/customer/orders/current",
+      undefined,
+      sessionToken,
+    ),
+  createCustomerOrder: (input: CreateOrderInput, sessionToken?: string | null) =>
+    apiFetch<CustomerOrderView>(
+      "/api/v1/customer/orders",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      sessionToken,
+    ),
+  fetchCustomerOrder: (orderId: string, sessionToken?: string | null) =>
+    apiFetch<CustomerOrderView>(
+      `/api/v1/customer/orders/${orderId}`,
+      undefined,
+      sessionToken,
+    ),
+  fetchDriverDashboard: (sessionToken?: string | null) =>
+    apiFetch<DriverDashboard>("/api/v1/driver/dashboard", undefined, sessionToken),
+  setDriverAvailability: (
+    availability: DriverAvailability,
+    sessionToken?: string | null,
+  ) =>
+    apiFetch(
+      "/api/v1/driver/status",
+      {
+        method: "POST",
+        body: JSON.stringify(availability),
+      },
+      sessionToken,
+    ),
+  updateDriverLocation: (
+    location: DriverLocationUpdate,
+    sessionToken?: string | null,
+  ) =>
+    apiFetch(
+      "/api/v1/driver/location",
+      {
+        method: "POST",
+        body: JSON.stringify(location),
+      },
+      sessionToken,
+    ),
+  registerDriverDevice: (
+    registration: DriverDeviceRegistration,
+    sessionToken?: string | null,
+  ) =>
+    apiFetch(
+      "/api/v1/driver/devices",
+      {
+        method: "POST",
+        body: JSON.stringify(registration),
+      },
+      sessionToken,
+    ),
+  respondToOffer: (
+    orderId: string,
+    decision: "accept" | "reject",
+    sessionToken?: string | null,
+  ) =>
     apiFetch<DriverDashboard>(
-      `/api/v1/drivers/${driverId}/offers/${orderId}/decision`,
+      `/api/v1/driver/offers/${orderId}/decision`,
       {
         method: "POST",
         body: JSON.stringify({ decision }),
       },
+      sessionToken,
     ),
   updateOrderStatus: (
-    driverId: string,
     orderId: string,
-    status: "on_the_way" | "picked_up" | "dropped_off" | "cancelled",
+    status: "accepted" | "on_the_way" | "picked_up" | "dropped_off" | "cancelled",
+    sessionToken?: string | null,
   ) =>
-    apiFetch(`/api/v1/drivers/${driverId}/orders/${orderId}/status`, {
-      method: "POST",
-      body: JSON.stringify({ status }),
-    }),
+    apiFetch(
+      `/api/v1/driver/orders/${orderId}/status`,
+      {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      },
+      sessionToken,
+    ),
   fetchTracking: (trackingToken: string) =>
     apiFetch<TrackingSnapshot>(`/api/v1/tracking/${trackingToken}`),
-  fetchDriverRealtimeCredentials: (driverId: string) =>
-    apiFetch<RealtimeCredentials>(`/api/v1/realtime/drivers/${driverId}/subscribe`),
+  fetchDriverRealtimeCredentials: (sessionToken?: string | null) =>
+    apiFetch<RealtimeCredentials>(
+      "/api/v1/realtime/driver/subscribe",
+      undefined,
+      sessionToken,
+    ),
   fetchTrackingRealtimeCredentials: (trackingToken: string) =>
     apiFetch<RealtimeCredentials>(
       `/api/v1/realtime/tracking/${trackingToken}/subscribe`,
     ),
-  createDemoOrder: () =>
-    apiFetch(`/api/v1/orders`, {
-      method: "POST",
-      body: JSON.stringify({
-        customerName: "Dispatch Sandbox",
-        customerPhoneNumber: "+45 11 22 33 44",
-        priority: "priority",
-        pickup: {
-          addressLine: "Nordre Toldbod 18, Copenhagen",
-          point: { latitude: 55.6929, longitude: 12.5993 },
-        },
-        dropoff: {
-          addressLine: "Kongens Nytorv 1, Copenhagen",
-          point: { latitude: 55.6798, longitude: 12.5851 },
-        },
-        notes: "Demo payload from driver PWA",
-      }),
-    }),
+  createDriverInvitation: (
+    payload: {
+      email: string;
+      driverName: string;
+      vehicleLabel: string;
+    },
+    sessionToken?: string | null,
+  ) =>
+    apiFetch<DriverInvitation>(
+      "/api/v1/admin/driver-invitations",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      sessionToken,
+    ),
 };

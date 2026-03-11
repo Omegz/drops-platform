@@ -91,6 +91,8 @@ const activeOrderStatuses = new Set<OrderStatus>([
 const seededDrivers: DriverRecord[] = [
   {
     id: "driver_demo_01",
+    userId: null,
+    email: "driver_demo_01@drops.app",
     name: "Mikael Jensen",
     phoneNumber: "+45 12 34 56 78",
     vehicleLabel: "Van 12",
@@ -105,6 +107,8 @@ const seededDrivers: DriverRecord[] = [
   },
   {
     id: "driver_demo_02",
+    userId: null,
+    email: "driver_demo_02@drops.app",
     name: "Sara Nielsen",
     phoneNumber: "+45 21 43 65 87",
     vehicleLabel: "Bike 4",
@@ -119,6 +123,8 @@ const seededDrivers: DriverRecord[] = [
   },
   {
     id: "driver_demo_03",
+    userId: null,
+    email: "driver_demo_03@drops.app",
     name: "Jonas Holm",
     phoneNumber: "+45 98 76 54 32",
     vehicleLabel: "Car 9",
@@ -170,6 +176,7 @@ export interface DispatchRepository {
 
 const toDriver = (row: DriverRow, devices: DriverDeviceRegistration[] = []): DriverRecord => ({
   id: row.id,
+  userId: null,
   name: row.name,
   phoneNumber: row.phone_number ?? undefined,
   vehicleLabel: row.vehicle_label,
@@ -188,6 +195,7 @@ const toDriver = (row: DriverRow, devices: DriverDeviceRegistration[] = []): Dri
 
 const toOrder = (row: OrderRow): Order => ({
   id: row.id,
+  customerUserId: null,
   customerName: row.customer_name,
   customerPhoneNumber: row.customer_phone_number ?? undefined,
   pickup: JSON.parse(row.pickup_json),
@@ -275,8 +283,9 @@ export class InMemoryDispatchRepository implements DispatchRepository {
       };
     }
 
-    const created: DriverRecord = {
+      const created: DriverRecord = {
       id: driverId,
+      userId: null,
       name: `Driver ${driverId.slice(-4)}`,
       vehicleLabel: "Unassigned vehicle",
       availability: "offline",
@@ -355,6 +364,7 @@ export class InMemoryDispatchRepository implements DispatchRepository {
     const timestamp = nowIso();
     const order: Order = {
       id: createId("ord"),
+      customerUserId: null,
       customerName: input.customerName,
       customerPhoneNumber: input.customerPhoneNumber,
       pickup: input.pickup,

@@ -14,8 +14,8 @@ self.addEventListener("push", (event) => {
   const payload = event.data.json();
 
   event.waitUntil(
-    self.registration.showNotification("Drops Driver", {
-      body: payload.body ?? "New driver update available",
+    self.registration.showNotification("Drops Dispatch", {
+      body: payload.body ?? "New dispatch update available",
       data: payload,
       icon: "/icon.svg",
       badge: "/icon.svg",

@@ -1,9 +1,14 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "baseUrl": ".",
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@drops/auth-client": ["../../packages/auth-client/src/index.ts"],
+      "@drops/contracts": ["../../packages/contracts/src/index.ts"],
+      "@drops/maps": ["../../packages/maps/src/index.tsx"],
+      "@drops/ui": ["../../packages/ui/src/index.tsx"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

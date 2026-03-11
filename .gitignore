@@ -7,3 +7,4 @@ dist
 .env
 .env.local
 coverage
+.env*.local

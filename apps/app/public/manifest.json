@@ -1,6 +1,6 @@
 {
-  "short_name": "Drops Driver",
-  "name": "Drops Driver Dispatch App",
+  "short_name": "Drops",
+  "name": "Drops Dispatch App",
   "display": "standalone",
   "start_url": "/",
   "background_color": "#101312",

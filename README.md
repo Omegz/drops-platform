@@ -1,103 +1,101 @@
 # Drops Platform
 
-Monorepo for an Uber-style delivery platform with:
+Unified dispatch monorepo for an Uber-like delivery product with:
 
-- `apps/api`: enterprise-style Hono API for dispatch, driver presence, offers, tracking, and outbound customer webhooks.
-- `apps/driver-app`: Expo Router driver app that runs as a Vercel-hosted PWA now and can move to iOS/Android later.
-- `packages/contracts`: shared Zod contracts used by both sides.
+- `apps/api`: Hono API on Vercel for auth, customer orders, driver operations, tracking, realtime credentials, webhooks, and dispatch orchestration
+- `apps/app`: one Expo Router web/PWA app on Vercel that contains customer, driver, settings, and public tracking routes
+- `packages/contracts`: shared Zod contracts for API and app
+- `packages/ui`: gluestack-based shared design primitives
+- `packages/maps`: shared night-map rendering primitives used by customer and driver flows
+- `packages/auth-client`: bearer-token session storage helpers for the Expo app
 
 Provider split:
 
 - Database: Cloudflare D1
 - Compute and hosting: Vercel
-- Realtime, delayed jobs, and logistics tracking: SaaSignal
+- Realtime, delayed jobs, and logistics abstraction: SaaSignal
 
-## Architecture
+## Current product shape
 
 ### API
 
-The API is organized around a thin-route and service-layer pattern:
+The API follows a thin-route + service-layer pattern and now exposes:
 
-- Driver presence: go online/offline, publish location, register push channels.
-- Dispatch: create orders, rank candidate drivers, issue concurrent offers, handle accept/reject.
-- Execution: advance orders through `accepted -> on_the_way -> picked_up -> dropped_off`.
-- Tracking: return a public tracking snapshot backed by a tracking token.
-- Customer sync: emit signed webhooks when key dispatch events occur.
+- `/api/auth/*` for session state, magic-link request, verification, and sign-out
+- `/api/v1/me` and `/api/v1/me/active-role` for role-aware session switching
+- `/api/v1/customer/orders*` for authenticated customer order creation and live order lookup
+- `/api/v1/driver/*` for dashboard, status, location, device registration, offer decisions, and status progression
+- `/api/v1/admin/driver-invitations*` for invite-and-approve driver enablement
+- `/api/v1/tracking/:trackingToken` and `/api/v1/realtime/*` for public/live tracking
 
-Current storage is Cloudflare D1 through the Cloudflare REST API so the API can stay on Vercel while the canonical data stays on Cloudflare.
-The repository auto-applies the D1 schema on first use when the Cloudflare env vars are present.
+Cloudflare D1 remains the canonical store. SaaSignal is used for channels, background jobs, and the current logistics abstraction layer that feeds route/ETA payloads to the frontend.
 
-The API also uses SaaSignal in three ways:
+### App
 
-- `infra.channels` for driver and tracking realtime streams
-- `infra.jobs` for delayed offer expiry and retryable customer-webhook delivery
-- `logistics.tracking` for driver position pings
+The Expo app is now one unified surface, split by role:
 
-### Driver app
+- `/` public landing
+- `/sign-in` magic-link sign-in
+- `/customer` customer order creation and live order state
+- `/driver` driver city map, incoming offer state, and active trip workflow
+- `/settings` role switching and session controls
+- `/track/[token]` public tracking view
 
-The Expo app is designed as a field console:
-
-- Online/offline toggle
-- Automatic location heartbeat while online
-- Offer inbox with accept/reject
-- Active assignment cockpit with Google Maps deep links
-- Public `/track/[token]` route for customer tracking
-- PWA manifest + service worker for installable web delivery
-- SaaSignal-backed realtime subscription with polling fallback
-
-## Push strategy
-
-The project uses two push channels because the web PWA and native app have different constraints:
-
-- Web PWA: Web Push via service worker + VAPID keys
-- Native iOS/Android later: Expo push tokens via `expo-notifications`
-
-This split is intentional. The backend exposes one device-registration endpoint and stores either token shape.
+The UI direction is a dark dispatch-control-room layout built on `gluestack-ui`, with full-screen map stages, bright pickup/dropoff emphasis, animated offer toast behavior, and swipe-based driver task progression.
 
 ## Project layout
 
 ```text
 apps/
   api/
-  driver-app/
+  app/
 packages/
+  auth-client/
   contracts/
+  maps/
+  ui/
 ```
 
 ## Environment
 
-Copy the values from [.env.example](/Users/omar/workDevelopment/personalProjects/dropsAppApi/.env.example) into your local env setup.
+Copy [.env.example](/Users/omar/workDevelopment/personalProjects/dropsAppApi/.env.example) into your local env setup.
 
 Minimum useful local setup:
 
 - `APP_BASE_URL=http://localhost:8081`
 - `EXPO_PUBLIC_API_URL=http://localhost:3000`
-- `EXPO_PUBLIC_DRIVER_ID=driver_demo_01`
+- `INTERNAL_JOB_SECRET=local-dev-job-secret`
 
-For production-grade Cloudflare + SaaSignal + push:
+Production-oriented variables:
 
 - `API_BASE_URL`
+- `APP_BASE_URL`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_D1_DATABASE_ID`
-- `INTERNAL_JOB_SECRET`
 - `SAASIGNAL_API_KEY`
 - `SAASIGNAL_API_URL`
+- `CUSTOMER_WEBHOOK_SIGNING_SECRET`
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
-- `CUSTOMER_WEBHOOK_SIGNING_SECRET`
 - `EXPO_PROJECT_ID`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `ADMIN_EMAILS`
 
 ## Local run
 
-1. Install workspace dependencies with `pnpm install`
+1. Install dependencies with `pnpm install`
 2. Start the API with `pnpm --filter @drops/api dev`
-3. Start the driver app with `pnpm --filter @drops/driver-app dev`
-4. Open the Expo web target or install the PWA locally
+3. Start the Expo app with `pnpm --filter @drops/app dev`
+4. Open the Expo web target and sign in through the magic-link flow
 
-The API seeds demo drivers, so the default `driver_demo_01` id is ready immediately.
-Use the “Dispatch demo order” action inside the app to simulate customer demand before the customer-facing product exists.
+Demo driver identities are seeded in the API and exposed on the sign-in screen:
+
+- `driver_demo_01@drops.app`
+- `driver_demo_02@drops.app`
+- `driver_demo_03@drops.app`
 
 ## Vercel deployment
 
@@ -105,30 +103,56 @@ Create two Vercel projects from the same repository:
 
 1. API project
    Root directory: `apps/api`
-2. Driver app project
-   Root directory: `apps/driver-app`
+2. App project
+   Root directory: `apps/app`
 
-Recommended env split:
+The repo now includes app-local Vercel config in:
 
-- API project:
-  `API_BASE_URL`, `APP_BASE_URL`, `CUSTOMER_WEBHOOK_SIGNING_SECRET`, `WEB_PUSH_*`, `EXPO_PROJECT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_D1_DATABASE_ID`, `INTERNAL_JOB_SECRET`, `SAASIGNAL_API_KEY`, `SAASIGNAL_API_URL`
-- Driver app project:
-  `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_DRIVER_ID`
+- [apps/api/vercel.json](/Users/omar/workDevelopment/personalProjects/dropsAppApi/apps/api/vercel.json)
+- [apps/app/vercel.json](/Users/omar/workDevelopment/personalProjects/dropsAppApi/apps/app/vercel.json)
 
 Recommended production URLs:
 
 - API: `https://api.your-domain.com`
-- Driver app / public tracking: `https://driver.your-domain.com`
+- App: `https://app.your-domain.com`
 
 Set:
 
 - `API_BASE_URL=https://api.your-domain.com`
-- `APP_BASE_URL=https://driver.your-domain.com`
+- `APP_BASE_URL=https://app.your-domain.com`
 - `EXPO_PUBLIC_API_URL=https://api.your-domain.com`
 
-## Next production steps
+## GitHub Actions deployment
 
-- Add authenticated driver identity instead of environment-driven demo ids.
-- Add a customer-facing app or website that consumes the webhook stream and tracking endpoint.
-- Move the candidate scoring from haversine-only to SaaSignal routing or Google Routes ETA weighting once the provider credentials are finalized.
-- Add signed admin routes for Cloudflare D1 migrations and SaaSignal project bootstrap if you want this repo to self-provision in CI.
+The repo includes [deploy-vercel.yml](/Users/omar/workDevelopment/personalProjects/dropsAppApi/.github/workflows/deploy-vercel.yml), which deploys both workspaces to Vercel on every push to `main`.
+
+Add these repository variables in GitHub Actions:
+
+- `VERCEL_ORG_ID=team_gIwhdIPOC8NRivSrT5Myj6OT`
+- `VERCEL_APP_PROJECT_ID=prj_9nuVd105hziFCutmWk7my9IVCHHg`
+- `VERCEL_API_PROJECT_ID=prj_VIXEF98gmA3Am1YFeLQiXR1hkwpD`
+
+Add this repository secret:
+
+- `VERCEL_TOKEN`
+
+The workflow uses the Vercel CLI in each workspace and runs:
+
+- `vercel pull --environment=production`
+- `vercel build --prod`
+- `vercel deploy --prebuilt --prod`
+
+## Verification
+
+Current repo verification that passes:
+
+- `pnpm --filter @drops/api typecheck`
+- `pnpm --filter @drops/app typecheck`
+- `pnpm typecheck`
+- `pnpm build`
+
+## Known follow-ups
+
+- Google OAuth is not wired end-to-end yet; the current working auth path is magic-link sign-in.
+- SaaSignal logistics is represented through the internal `SaaSignalLogisticsService` abstraction; direct provider-specific routing APIs are not yet integrated in this repo.
+- Native iOS/Android packaging is still future work, but the unified Expo app and shared packages are structured for that split.

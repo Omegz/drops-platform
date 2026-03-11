@@ -1,6 +1,8 @@
 import type {
+  CustomerOrderView,
   DispatchCandidate,
   DispatchDecision,
+  Driver,
   DriverDashboard,
   DriverDeviceRegistration,
   DriverLocationUpdate,
@@ -14,7 +16,6 @@ import type {
 } from "@drops/contracts";
 import { AppError } from "../lib/http-error.js";
 import { createId } from "../lib/id.js";
-import { haversineDistanceKm } from "../lib/haversine.js";
 import {
   buildGoogleMapsDirectionsUrl,
   buildTrackingUrl,
@@ -24,6 +25,7 @@ import type {
   CandidateDriverRecord,
   DispatchRepository,
 } from "./repository.js";
+import { SaaSignalLogisticsService } from "./saasignal-logistics-service.js";
 import { SaaSignalDispatchService } from "./saasignal-service.js";
 import { CustomerWebhookService } from "./webhook-service.js";
 
@@ -53,6 +55,7 @@ export class DispatchService {
     private readonly pushService: PushService,
     private readonly webhookService: CustomerWebhookService,
     private readonly saasignalService: SaaSignalDispatchService | null,
+    private readonly logisticsService: SaaSignalLogisticsService,
     private readonly appBaseUrl: string,
   ) {}
 
@@ -391,7 +394,7 @@ export class DispatchService {
       throw new AppError(404, "TRACKING_NOT_FOUND", "Tracking token was not found.");
     }
 
-    const driver = order.assignedDriverId
+    const driver: Driver | null = order.assignedDriverId
       ? await this.repository.getDriver(order.assignedDriverId)
       : null;
 
@@ -412,6 +415,28 @@ export class DispatchService {
           }
         : null,
       timeline: await this.repository.listOrderEvents(order.id),
+      map: this.logisticsService.buildTaskMap(order, driver),
+    };
+  }
+
+  async getOrder(orderId: string) {
+    return this.repository.getOrder(orderId);
+  }
+
+  async getCustomerOrderView(
+    orderId: string,
+    customerUserId: string | null,
+  ): Promise<CustomerOrderView> {
+    const order = await this.repository.getOrder(orderId);
+    const tracking = await this.getTrackingByToken(order.trackingToken);
+
+    return {
+      order: {
+        ...order,
+        customerUserId,
+      },
+      tracking,
+      shareUrl: buildTrackingUrl(this.appBaseUrl, order.trackingToken),
     };
   }
 
@@ -447,40 +472,7 @@ export class DispatchService {
 
   private async rankCandidates(order: Order) {
     const candidates = await this.repository.listCandidateDrivers();
-
-    return candidates
-      .filter((driver) => driver.lastKnownLocation)
-      .map((driver) => this.scoreDriver(driver, order))
-      .sort((left, right) => left.score - right.score);
-  }
-
-  private scoreDriver(
-    driver: CandidateDriverRecord,
-    order: Order,
-  ): DispatchCandidate {
-    const distanceKm = haversineDistanceKm(
-      driver.lastKnownLocation!,
-      order.pickup.point,
-    );
-    const loadPenalty = driver.activeOrderCount * 3.5;
-    const stalePenalty = driver.lastLocationAt
-      ? Math.min(
-          5,
-          (Date.now() - new Date(driver.lastLocationAt).getTime()) / 300_000,
-        )
-      : 10;
-    const priorityBoost = order.priority === "priority" ? -1.5 : 0;
-    const score = Number(
-      (distanceKm * 1.2 + loadPenalty + stalePenalty + priorityBoost).toFixed(2),
-    );
-
-    return {
-      driverId: driver.id,
-      distanceKm: Number(distanceKm.toFixed(2)),
-      activeOrderCount: driver.activeOrderCount,
-      score,
-      rationale: `distance ${distanceKm.toFixed(1)}km + load ${driver.activeOrderCount} + freshness penalty ${stalePenalty.toFixed(1)}`,
-    };
+    return this.logisticsService.rankDrivers(candidates as CandidateDriverRecord[], order);
   }
 
   private buildNavigation(order: Order): NavigationLinks {
